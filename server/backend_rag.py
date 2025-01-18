@@ -106,6 +106,7 @@ def query_vector_store(query_str):
 # Route to upload document and process it
 @app.route("/upload", methods=["POST"])
 def upload_document():
+    print("Uploading the document")
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -128,7 +129,7 @@ def upload_document():
 def query_document():
     data = request.get_json()
     query_str = data.get("query")
-    
+    print("Query Received ", query_str)
     if not query_str:
         return jsonify({"error": "Query string is required"}), 400
 

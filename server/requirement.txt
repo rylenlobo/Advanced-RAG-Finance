@@ -1,0 +1,11 @@
+flask
+pymupdf
+llama-index
+pinecone
+typing
+llama_index.llms.ollama
+llama_index.vector_stores.pinecone
+llama_index.embeddings.huggingface
+llama_index.core
+matplotlib
+IPython
