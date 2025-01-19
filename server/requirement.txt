@@ -9,3 +9,10 @@ llama_index.embeddings.huggingface
 llama_index.core
 matplotlib
 IPython
+google.generativeai
+pillow
+python-dotenv
+pathlib
+asyncio
+flask[async]
+redis
