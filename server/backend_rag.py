@@ -1,85 +1,146 @@
 import os
-from flask import Flask, request, jsonify, send_file
-import pymupdf
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.core.schema import TextNode
+from flask import Flask, request, jsonify, send_file, Response
 from llama_index.llms.ollama import Ollama
 from llama_index.vector_stores.pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core.vector_stores import VectorStoreQuery
-from llama_index.core.response.notebook_utils import display_source_node
 from pinecone_retriver import PineconeRetriever
-from llama_index.core.schema import NodeWithScore
-from typing import Optional
+from llama_index.core.schema import MetadataMode
 from google.generativeai import GenerativeModel
 import google.generativeai as genai
 from PIL import Image
 import fitz  # PyMuPDF
 from pathlib import Path
-import base64
-import asyncio
 import redis
 import json
-import pickle
+from llama_index.core import PromptTemplate
+from marker.converters.pdf import PdfConverter
+from marker.models import create_model_dict
+from marker.config.parser import ConfigParser
+from marker.output import save_output
+from llama_index.core.schema import Document
+from llama_index.core.node_parser import MarkdownNodeParser
+from llama_index.core.chat_engine import ContextChatEngine
+from llama_index.core.memory import ChatMemoryBuffer
+from dotenv import load_dotenv
+from llama_index.core import Settings
+from llama_index.core.indices.query.query_transform.base import HyDEQueryTransform
+from llama_index.core.query_engine import TransformQueryEngine
+from llama_index.core import VectorStoreIndex
 
 app = Flask(__name__)
 
+# Load environment variables from .env file
+load_dotenv()
 # Define the API key for Pinecone
-PINECONE_API_KEY = "0aa2686e-8e56-4f53-8aff-598bbfaa3570"
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
 
 # Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
-index_name = "financial-annual-report-rag-1"
+# index_name = "financial-annual-report-rag-1-gaurav"/
 
 # Check if index exists, create if it does not
-if index_name not in pc.list_indexes().names():
-    pc.create_index(
-        index_name,
-        dimension=384,
-        metric="euclidean",
-        spec=ServerlessSpec(cloud="aws", region="us-east-1")
-    )
+# if index_name not in pc.list_indexes().names():
+#     pc.create_index(
+#         index_name,
+#         dimension=384,
+#         metric="euclidean",
+#         spec=ServerlessSpec(cloud="aws", region="us-east-1")
+#     )
 
-pinecone_index = pc.Index(index_name)
+
+pinecone_index = pc.Index("financial-annual-report-rag-1-gaurav")
 vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
 
 # Initialize embedding model
-embed_model = HuggingFaceEmbedding()
+embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5", model_kwargs={
+    "trust_remote_code": True
+})
 
 # Initialize LLM (Language Model)
 llm = Ollama(
-    model="llama3",  # Make sure this model name matches exactly what you have in Ollama
-    base_url="http://localhost:11434",  # Explicitly set the base URL
-    timeout=300,  # 5 minutes timeout
-    request_timeout=300.0,  # Request timeout in seconds
+    model="llama3",
+    stream=True,
+    request_timeout=3000, # Request timeout in seconds
 )
+# Set the LLM and embedding model in the Settings
+Settings.llm = llm
+Settings.embed_model = embed_model
+
 
 # Query template for LLM
-qa_prompt = """\
-Context information is below.
+qa_prompt = PromptTemplate(
+    """\
+You are a highly skilled financial analyst assistant specializing in advanced RAG (Retrieval Augmented Generation). Your primary goal is to provide direct and concise answers to user queries based on the provided context. While you possess advanced analytical capabilities, prioritize clarity and efficiency.
+
+### Your Capabilities:
+
+*   **Precise Information Retrieval:** You extract specific information directly from the provided context to answer user questions accurately.
+*   **Concise Calculation and Analysis:** You perform necessary calculations (growth rates, ratios, etc.) and analysis only when explicitly required by the user's query or when essential for providing a complete answer. Show your work briefly.
+*   **Contextual Awareness:** You understand the context of the provided financial information and ensure your answers are relevant.
+*   **Clear and Direct Communication:** You communicate your findings in a clear, concise, and professional manner, avoiding unnecessary jargon or lengthy explanations unless specifically requested.
+*   **Handling Missing Information:** If data is missing, you clearly state what is unavailable.
+
+### How to Respond to User Queries:
+
+1.  **Understand the User's Goal:** What specific information is the user seeking?
+2.  **Locate Relevant Information in the Context:** Identify the parts of the context that directly address the user's query.
+3.  **Provide a Direct and Concise Answer:** Answer the question directly using information from the context.
+4.  **Show Your Work Briefly (Only When Necessary):** If a calculation is required, show the steps briefly. Avoid lengthy explanations unless the user specifically asks for them.
+5.  **State Missing Information:** If the required information is not in the context, state that it is unavailable.
+6.  **Avoid Overthinking:** Do not speculate, make assumptions, or provide unnecessary analysis unless explicitly asked to do so. Focus on providing direct answers based on the provided information.
+7. Respond naturally and conversationally, as if you were a helpful assistant. Provide the requested information directly without citing sources unless the user asks where the information came from.
+8. If a question is ambiguous or requires clarification, you can say something like, "Could you please clarify what you mean by [ambiguous term]?" or "To best answer your question, could you provide more details about [specific aspect]?
+9. If a question requires some level of inference but doesn't explicitly ask for an explanation, you can provide the inferred answer directly. However, if the user asks how you arrived at the answer, then provide the reasoning and cite the relevant parts of the context.
+
+### Context:
 ---------------------
 {context_str}
 ---------------------
-Given the context information and not prior knowledge, answer the query with it starting from the question. 
 
-Query: {query_str}
-Answer: \
+### User Query:
+{query_str}
+
+##Response:
 """
+)
+
+# qa_prompt = f"""You're an AI model designed to analyze images and locate all tables, including those without visible borders. For each detected table, you identify rows, columns, and cells with high precision, regardless of visual separators, capturing finer details such as text style, alignment, symbols, and any other attributes within each cell. You extract all data while preserving the exact structure seen in the image, ensuring that the output table has the same number of rows and columns. The position of attributes, values, and any text or symbols within cells should match their original positions in the image and appear the same in markdown format. Column attributes are displayed accurately at the top of each column, directly above the respective values, if present. If no column attributes are found, avoid adding any default row or column headers. If a header row is present, use it to identify column names.
+# You maintain the original layout and structure as closely as possible to match the source table in the image. Following extraction, you generate a detailed summary that highlights essential figures, names, or notable patterns. You also verify if the total or any value depends on the entire column (e.g., sums, averages, or derived values) and ensure that the output reflects this correctly. Present the output in markdown format, keeping both the table structure and summary concise, and ensuring that all elements retain their original positions from the image. If no table is found in the image, return 'Table not found.' You perform these tasks without asking further questions, ensuring precision and consistency.
+# Also you have the option to calculate total of values of a column if necessary based on the context in the image.
+# """
 
 # Add Gemini API configuration
-GOOGLE_API_KEY = "AIzaSyAkR5NoEbXxB2nkKFdo7wNfMokp523llPg"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# Set the Pinecone API key as an environment variable
+os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+
 genai.configure(api_key=GOOGLE_API_KEY)
 gemini_model = GenerativeModel('gemini-1.5-flash')
 
 # Add this after initializing Flask app
 UPLOADS_DIR = 'uploads'
 os.makedirs(UPLOADS_DIR, exist_ok=True)
-
+os.environ["KMP_DUPLICATE_LIB_OK"]="True"
 # Initialize Redis client
 redis_client = redis.Redis(host='localhost', port=6379, db=0)
 CACHE_EXPIRATION = 3600  # Cache expiration in seconds (1 hour)
+
+# Initialize Marker configuration with reduced memory usage
+marker_config = {
+    "output_format": "markdown",
+    "use_llm": True,
+    "disable_image_extraction": True,
+    "paginate_output": True,
+    "model_device": "cpu",
+    "model_dtype": "float16",  # Use float16 instead of float32 to reduce memory usage
+    "batch_size": 1,
+    "max_length": 512,  # Limit sequence length
+    "low_cpu_mem_usage": True,  # Enable low memory usage
+}
+
 
 async def batch_process_images(images_data):
     """Process multiple images in a single Gemini query"""
@@ -133,7 +194,8 @@ async def batch_process_images(images_data):
             
             result = {
                 "original_data": images_data[original_idx],
-                "type": "TABLE" if "TYPE: TABLE" in analysis else "CHART"
+                "type": "TABLE" if "TYPE: TABLE" in analysis else "CHART",
+                "summary": "No summary available"  # Default summary
             }
             
             if result["type"] == "TABLE":
@@ -147,13 +209,13 @@ async def batch_process_images(images_data):
                         "table_in_md": md_section.replace("MARKDOWN:", "").strip(),
                         "summary": summary_section.replace("SUMMARY:", "").strip()
                     })
-            else:
+            else:  # CHART
+                chart_type_start = analysis.find("CHART_TYPE:")
                 summary_start = analysis.find("SUMMARY:")
+                
                 if summary_start != -1:
                     summary_section = analysis[summary_start:].strip()
-                    result.update({
-                        "summary": summary_section.replace("SUMMARY:", "").strip()
-                    })
+                    result["summary"] = summary_section.replace("SUMMARY:", "").strip()
                     
             results.append(result)
         
@@ -178,77 +240,74 @@ async def upload_image():
         temp_path = os.path.join(UPLOADS_DIR, f"temp_{file.filename}")
         file.save(temp_path)
 
-        # Process single image
-        image_data = [{
-            "path": temp_path,
-            "page_num": 1,  # Single image, so page 1
-            "img_index": 0,
-            "bytes": file.read()
-        }]
+        
+        # Creating a config parser instance with specified options
+        config = {
+            "output_format": "markdown",  # Outputs to markdown
+            "use_llm": True,  # Enables the use of Gemini to improve accuracy
+            "disable_image_extraction": True,  # Doesn't extract images, produces descriptions instead when used with use_llm
+            "paginate_output":True,
+            "output_dir": 'output'
+            #"force_ocr": True  # Force OCR processing on the entire document (takes time, can be disabled) remove if not needed
+        }
+        # Initializing the config parser with the config dictionary
+        config_parser = ConfigParser(config)
 
-        # Reset file pointer after reading
-        file.seek(0)
+        # Creating a PDF converter instance with the generated config, model dictionary, processors, and renderer
+        converter = PdfConverter(
+            config=config_parser.generate_config_dict(),
+            artifact_dict=create_model_dict(),
+            processor_list=config_parser.get_processors(),
+            renderer=config_parser.get_renderer()
+        )
 
-        # Process image with Gemini
-        image_results = await batch_process_images(image_data)
-        nodes = []
+        print("Converting the PDF")
+        out_folder = config_parser.get_output_folder(temp_path)
+        base_fname = config_parser.get_base_filename(temp_path)
 
-        if image_results:
-            result = image_results[0]
-            img_data = result["original_data"]
-            img_filename = f"{result['type'].lower()}_single_{file.filename}"
-            saved_img_path = os.path.join(UPLOADS_DIR, img_filename)
+        # Converting the PDF and saving the output
+        rendered = converter(temp_path)  # Pass the location of the PDF
+        save_output(rendered, out_folder, base_fname )
 
-            # Save final image
-            with open(saved_img_path, "wb") as f:
-                f.write(img_data["bytes"])
+        print("Saved the output")
 
-            # Create node based on type
-            if result["type"] == "TABLE":
-                node = TextNode(
-                    text=f"""Table Content:\n{result['table_in_md']}\n\nTable Summary:\n{result['summary']}""",
-                    metadata={
-                        "type": "table",
-                        "page_num": 1,
-                        "file_path": img_filename,
-                        "image_path": img_filename,
-                        "source_type": "table_content",
-                        "reference": f"/document/image/{img_filename}",
-                        "table_in_md": result['table_in_md'],
-                        "summary": result['summary']
-                    }
-                )
-            else:
-                node = TextNode(
-                    text=f"""Chart Summary:\n{result['summary']}""",
-                    metadata={
-                        "type": "chart",
-                        "page_num": 1,
-                        "file_path": img_filename,
-                        "image_path": img_filename,
-                        "source_type": "chart_content",
-                        "reference": f"/document/image/{img_filename}",
-                        "summary": result['summary']
-                    }
-                )
+        md_text = rendered.markdown
 
-            # Embed and store node
-            node_embedding = embed_model.get_text_embedding(node.get_content(metadata_mode="all"))
+        # Split the markdown text into parts using the separator
+        parts = md_text.split('------PAGE_BREAK------')
+
+        # Create a list of Document objects from the parts, including the last part
+        # Each Document includes the text and metadata with the file name and page number
+        documents = [Document(text=parts[i].strip(), metadata={
+                      'file_name': config_parser.get_base_filename(temp_path) + ".pdf", "page_number": i}) for i in range(len(parts)) if parts[i].strip()]
+
+        # Parse nodes using MarkdownNodeParser
+        node_parser = MarkdownNodeParser()
+        # nodes = node_parser.get_nodes_from_documents(documents)
+        nodes = node_parser(documents)
+        print("Parsed the nodes")
+        # Embed and store nodes
+        for node in nodes:
+             # Get the text embedding for the content of the node
+            node_embedding = embed_model.get_text_embedding(
+                node.get_content()
+            )
+            # Assign the embedding to the node's embedding attribute
             node.embedding = node_embedding
-            vector_store.add([node])
+        print("Stored the nodes")
 
-            # Clean up temporary file
-            os.remove(temp_path)
+        for node in nodes:
+            if hasattr(node, "excluded_embed_metadata_keys") and hasattr(node, "excluded_llm_metadata_keys"):
+                del node.excluded_embed_metadata_keys
+                del node.excluded_llm_metadata_keys
 
-            return jsonify({
-                "message": "Image processed successfully",
-                "type": result["type"],
-                "summary": result["summary"],
-                "table_in_md": result["table_in_md"] if result["type"] == "TABLE" else None,
-                "image_path": f"/document/image/{img_filename}"
-            }), 200
-        else:
-            return jsonify({"error": "Failed to process image"}), 500
+        # Clean up temporary file
+        # os.remove(temp_path)
+
+        return jsonify({
+            "message": "Image processed successfully",
+            "nodes": [node.to_dict() for node in nodes]
+        }), 200
 
     except Exception as e:
         # Clean up temporary file in case of error
@@ -258,148 +317,127 @@ async def upload_image():
 
 
 def process_and_store_document(file_path):
-    # Clear existing cache when new document is added
-    redis_client.flushdb()
-    
-    doc = fitz.open(file_path)
-    nodes = []
-    images_to_process = []
-    
-    # Store the original file path
-    rel_file_path = os.path.relpath(file_path, UPLOADS_DIR)
-    
-    for page_num in range(len(doc)):
-        page = doc[page_num]
+    try:
+          
+        # Creating a config parser instance with specified options
+        config = {
+            "output_format": "markdown",  # Outputs to markdown
+            "use_llm": True,  # Enables the use of Gemini to improve accuracy
+            "disable_image_extraction": True,  # Doesn't extract images, produces descriptions instead when used with use_llm
+            "paginate_output":True,
+            "output_dir": 'output'
+            #"force_ocr": True  # Force OCR processing on the entire document (takes time, can be disabled) remove if not needed
+        }
+        # Initializing the config parser with the config dictionary
+        config_parser = ConfigParser(config)
+
+        # Creating a PDF converter instance with the generated config, model dictionary, processors, and renderer
+        converter = PdfConverter(
+            config=config_parser.generate_config_dict(),
+            artifact_dict=create_model_dict(),
+            processor_list=config_parser.get_processors(),
+            renderer=config_parser.get_renderer()
+        )
+
+        print("Converting the PDF")
+        out_folder = config_parser.get_output_folder(file_path)
+        base_fname = config_parser.get_base_filename(file_path)
+
+        # Converting the PDF and saving the output
+        rendered = converter(file_path)  # Pass the location of the PDF
+        save_output(rendered, out_folder, base_fname )
+
+        print("Saved the output")
+
+        md_text = rendered.markdown
+
+        # Split the markdown text into parts using the separator
+        parts = md_text.split('------PAGE_BREAK------')
+
+        # Create a list of Document objects from the parts, including the last part
+        # Each Document includes the text and metadata with the file name and page number
+        documents = [Document(text=parts[i].strip(), metadata={
+                      'file_name': config_parser.get_base_filename(file_path) + ".pdf", "page_number": i}) for i in range(len(parts)) if parts[i].strip()]
+
+        # Parse nodes using MarkdownNodeParser
+        node_parser = MarkdownNodeParser(include_metadata=True)
+        # nodes = node_parser.get_nodes_from_documents(documents)
+        nodes = node_parser.get_nodes_from_documents(documents)
+        print("Parsed the nodes")
+        # Embed and store nodes
+        for node in nodes:
+             # Get the text embedding for the content of the node
+            node_embedding = embed_model.get_text_embedding(
+                node.get_content(metadata_mode=MetadataMode.EMBED)
+            )
+            # Assign the embedding to the node's embedding attribute
+            node.embedding = node_embedding
+        print("Stored the nodes")
+
+        for node in nodes:
+            if hasattr(node, "excluded_embed_metadata_keys") and hasattr(node, "excluded_llm_metadata_keys"):
+                del node.excluded_embed_metadata_keys
+                del node.excluded_llm_metadata_keys
         
-        # Extract text
-        text_parser = SentenceSplitter(chunk_size=512, chunk_overlap=50)
-        page_text = page.get_text("text")
-        text_chunks = text_parser.split_text(page_text)
-        
-        # Process text chunks
-        for chunk_num, text_chunk in enumerate(text_chunks):
-            if text_chunk.strip():  # Only process non-empty chunks
-                node = TextNode(
-                    text=text_chunk,
-                    metadata={
-                        "type": "text",
-                        "page_num": page_num + 1,
-                        "chunk_num": chunk_num,
-                        "file_path": rel_file_path,
-                        "source_type": "document_text",
-                        "reference": f"/document/{rel_file_path}?page={page_num + 1}"
-                    }
-                )
-                nodes.append(node)
+        #create index acc to file name
+        index_name = config_parser.get_base_filename(file_path)
 
-        # Collect images for batch processing
-        images = page.get_images(full=True)
-        for img_index, img_info in enumerate(images):
-            img_xref = img_info[0]
-            image_bytes = doc.extract_image(img_xref)["image"]
-            
-            temp_img_path = f"temp_img_{page_num}_{img_index}.png"
-            with open(temp_img_path, "wb") as img_file:
-                img_file.write(image_bytes)
-            
-            images_to_process.append({
-                "path": temp_img_path,
-                "page_num": page_num + 1,
-                "img_index": img_index,
-                "bytes": image_bytes
-            })
+        if index_name not in pc.list_indexes().names():
+            pc.create_index(
+                index_name,
+                dimension=384,
+                metric="euclidean",
+                spec=ServerlessSpec(cloud="aws", region="us-east-1")
+            )
+            pinecone_index = pc.Index(index_name)
+            vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
 
-    # Batch process all images
-    if images_to_process:
-        image_results = asyncio.run(batch_process_images(images_to_process))
-        
-        for result in image_results:
-            img_data = result["original_data"]
-            img_filename = f"{result['type'].lower()}_{img_data['page_num']}_{img_data['img_index']}.png"
-            saved_img_path = os.path.join(UPLOADS_DIR, img_filename)
-            
-            # Save image
-            with open(saved_img_path, "wb") as f:
-                f.write(img_data["bytes"])
-            
-            # Create node based on type
-            if result["type"] == "TABLE":
-                node = TextNode(
-                    text=f"""Table Content:\n{result['table_in_md']}\n\nTable Summary:\n{result['summary']}""",
-                    metadata={
-                        "type": "table",
-                        "page_num": img_data["page_num"],
-                        "file_path": rel_file_path,
-                        "image_path": img_filename,
-                        "source_type": "table_content",
-                        "reference": f"/document/image/{img_filename}",
-                        "table_in_md": result['table_in_md'],
-                        "summary": result['summary']
-                    }
-                )
-            else:
-                node = TextNode(
-                    text=f"""Chart Summary:\n{result['summary']}""",
-                    metadata={
-                        "type": "chart",
-                        "page_num": img_data["page_num"],
-                        "file_path": rel_file_path,
-                        "image_path": img_filename,
-                        "source_type": "chart_content",
-                        "reference": f"/document/image/{img_filename}",
-                        "summary": result['summary']
-                    }
-                )
-            nodes.append(node)
-            
-        # Clean up temporary files
-        for img_data in images_to_process:
-            os.remove(img_data["path"])
+            vector_store.add(nodes)
+        # Clean up temporary file
+        os.remove(file_path)
 
-    # Embed and store nodes
-    for node in nodes:
-        node_embedding = embed_model.get_text_embedding(node.get_content(metadata_mode="all"))
-        node.embedding = node_embedding
-
-    vector_store.add(nodes)
+        return True
+    except Exception as e:
+        print(f"Error in process_and_store_document: {str(e)}")
+        raise
 
 # Modify the query_vector_store function to use caching
-def query_vector_store(query_str):
-    # Try to get cached results
-    cache_key = f"query_cache:{hash(query_str)}"
-    cached_result = redis_client.get(cache_key)
+# def query_vector_store(query_str):
+#     # Try to get cached results
+#     cache_key = f"query_cache:{hash(query_str)}"
+#     cached_result = redis_client.get(cache_key)
     
-    if cached_result:
-        print("Cache hit! Using cached results")
-        return pickle.loads(cached_result)
+#     if cached_result:
+#         print("Cache hit! Using cached results")
+#         return pickle.loads(cached_result)
     
-    print("Cache miss! Performing vector search")
-    # Original query logic
-    query_embedding = embed_model.get_query_embedding(query_str)
-    query_mode = "default"
-    vector_store_query = VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=10, mode=query_mode)
-    query_result = vector_store.query(vector_store_query)
+#     print("Cache miss! Performing vector search")
+#     # Original query logic
+#     query_embedding = embed_model.get_query_embedding(query_str)
+#     query_mode = "default"
+#     vector_store_query = VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=10, mode=query_mode)
+#     query_result = vector_store.query(vector_store_query)
 
-    # Retrieve nodes with scores
-    nodes_with_scores = []
-    for index, node in enumerate(query_result.nodes):
-        score: Optional[float] = None
-        if query_result.similarities is not None:
-            score = query_result.similarities[index]
-        nodes_with_scores.append(NodeWithScore(node=node, score=score))
+#     # Retrieve nodes with scores
+#     nodes_with_scores = []
+#     for index, node in enumerate(query_result.nodes):
+#         score: Optional[float] = None
+#         if query_result.similarities is not None:
+#             score = query_result.similarities[index]
+#         nodes_with_scores.append(NodeWithScore(node=node, score=score))
 
-    # Use PineconeRetriever to retrieve nodes
-    retriever = PineconeRetriever(vector_store, embed_model, query_mode="default", similarity_top_k=10)
-    retrieved_nodes = retriever.retrieve(query_str)
+#     # Use PineconeRetriever to retrieve nodes
+#     retriever = PineconeRetriever(vector_store, embed_model, query_mode="default", similarity_top_k=10)
+#     retrieved_nodes = retriever.retrieve(query_str)
     
-    # Cache the results
-    redis_client.setex(
-        cache_key,
-        CACHE_EXPIRATION,
-        pickle.dumps(retrieved_nodes)
-    )
+#     # Cache the results
+#     redis_client.setex(
+#         cache_key,
+#         CACHE_EXPIRATION,
+#         pickle.dumps(retrieved_nodes)
+#     )
     
-    return retrieved_nodes
+#     return retrieved_nodes
 
 # Route to upload document and process it
 @app.route("/upload", methods=["POST"])
@@ -422,71 +460,162 @@ def upload_document():
 
     return jsonify({"message": "Document uploaded and processed successfully!"}), 200
 
+# def generate_response(retrieved_nodes, query_str, qa_prompt, llm, retriever, timeout=300):
+#     try:
+#         context_str = "\n\n".join([r.get_content() for r in retrieved_nodes])
+#         # Limit context size to prevent overloading
+#         # max_context_length = 4000  # Adjust this value based on your LLM's limits
+#         # if len(context_str) > max_context_length:
+#         #     context_str = context_str[:max_context_length]
+#         fmt_qa_prompt = qa_prompt.format(context_str=context_str, query_str=query_str)
+#         chat_engine = ContextChatEngine.from_defaults(
+#             retriever=retriever,
+#             llm=llm,
+#             memory=ChatMemoryBuffer.from_defaults(token_limit=1024),  # Add token limit
+#             system_prompt="You are a helpful AI assistant that provides concise answers based on the given context.",
+#             # prefix_messages=[
+#             #     "According to the context provided, answer the query explicitly based on the provided content. Keep responses focused and relevant."
+#             # ]
+#         )
+
+#         # Use chat instead of direct completion
+#         response = chat_engine.chat(fmt_qa_prompt)
+#         return str(response),fmt_qa_prompt  # No need for formatted prompt with chat engine
+
+#     except Exception as e:
+#         error_msg = f"Error generating response: {str(e)}"
+#         print(error_msg)  # Log the error
+#         return f"An error occurred while processing your request: {str(e)}", None
+
 # Route to query the vector store
-@app.route("/query", methods=["POST"])
-async def query_document():
-    try:
-        data = request.get_json()
-        query_str = data.get("query")
-        print("Query Received ", query_str)
-        if not query_str:
-            return jsonify({"error": "Query string is required"}), 400
+# @app.route("/query", methods=["POST"])
+# async def query_document():
+#     try:
+#         data = request.get_json()
+#         query_str = data.get("query")
+#         print("Query Received:", query_str)
+        
+#         if not query_str:
+#             return jsonify({"error": "Query string is required"}), 400
 
-        # Limit context size by taking only most relevant chunks
-        retrieved_nodes = query_vector_store(query_str)[:5]  # Limit to top 5 most relevant nodes
+#         # Set a shorter timeout for retrieval
+#         retriever = PineconeRetriever(
+#             vector_store, 
+#             embed_model, 
+#             query_mode="default", 
+#             similarity_top_k=5  # Reduced from 10 to 5 for faster processing
+#         )
         
-        print("Retrieved Nodes: ", retrieved_nodes)
-        # Separate nodes by type
-        text_nodes = [n for n in retrieved_nodes if n.metadata.get("type") == "text"]
-        table_nodes = [n for n in retrieved_nodes if n.metadata.get("type") == "table"]
-        chart_nodes = [n for n in retrieved_nodes if n.metadata.get("type") == "chart"]
-        
-        print("Text Nodes: ", text_nodes)
-        print("Table Nodes: ", table_nodes)
-        print("Chart Nodes: ", chart_nodes)
-        # Combine context with clear separation
-        context_parts = []
-        
-        if text_nodes:
-            context_parts.append("Document Text Context:")
-            context_parts.append("\n".join([n.get_content() for n in text_nodes]))
-        
-        if table_nodes:
-            context_parts.append("\nRelevant Tables:")
-            context_parts.append("\n".join([n.get_content() for n in table_nodes]))
-        
-        if chart_nodes:
-            context_parts.append("\nRelevant Charts:")
-            context_parts.append("\n".join([n.get_content() for n in chart_nodes]))
-        
-        print("Context Parts: ", context_parts)
-        context_str = "\n\n".join(context_parts)
-        fmt_qa_prompt = qa_prompt.format(context_str=context_str, query_str=query_str)
-        response = llm.complete(fmt_qa_prompt)
+#         # Add timeout for retrieval
+#         retrieved_nodes = await asyncio.wait_for(
+#             asyncio.to_thread(retriever.retrieve, query_str),
+#             timeout=60  # 60 second timeout for retrieval
+#         )
 
-        print("Response: ", response)
-        # Enhanced source information
-        source_info = []
-        for node in retrieved_nodes:
-            source_data = {
-                "type": node.metadata.get("type", "unknown"),
-                "page_num": node.metadata.get("page_num"),
-                "source_type": node.metadata.get("source_type"),
-                "file_path": node.metadata.get("file_path"),
-                "reference": node.metadata.get("reference"),
-                "content": node.get_content(),
-                "metadata": node.metadata
-            }
-            source_info.append(source_data)
+#         response, fmt_qa_prompt = generate_response(
+#             retrieved_nodes=retrieved_nodes,
+#             query_str=query_str,
+#             qa_prompt=qa_prompt,
+#             llm=llm,
+#             retriever=retriever,
+#             timeout=120  # Reduced timeout for response generation
+#         )
 
-        return jsonify({
-            "response": str(response),
-            "sources": source_info,
-            "formatted_prompt": fmt_qa_prompt
-        })
+#         # Only include essential source information
+#         source_info = [{
+#             "type": node.metadata.get("type", "unknown"),
+#             "page_num": node.metadata.get("page_number"),
+#             "context": node.get_content(),
+#             "file_path": node.metadata.get("file_name")
+#         } for node in retrieved_nodes[:5]]  # Limit to top 5 sources
 
-    except Exception as e:
-        return jsonify({"error": f"Query processing failed: {str(e)}"}), 500
+#         return jsonify({
+#             "formatted_prompt": fmt_qa_prompt,
+#             "response": str(response),
+#             "sources": source_info
+#         })
+
+#     except asyncio.TimeoutError:
+#         return jsonify({
+#             "error": "Request timed out. Please try a more specific query or try again later."
+#         }), 504
+#     except Exception as e:
+#         print(f"Error in query_document: {str(e)}")  # Log the error
+#         return jsonify({
+#             "error": f"Query processing failed: {str(e)}"
+#         }), 500
+
+
+# api for stream response
+# @app.route("/stream-query", methods=["POST"])
+# def stream_response():
+#     data = request.get_json()
+#     query_str = data.get("query")
+
+#     retriever = PineconeRetriever(
+#         vector_store, embed_model, query_mode="semantic_hybrid", similarity_top_k=10
+#     )
+#     memory = ChatMemoryBuffer.from_defaults(token_limit=1500)
+#     chat_engine = ContextChatEngine.from_defaults(
+#         retriever=retriever,
+#         llm=llm,
+#         memory=memory,
+#         context_template=qa_prompt,
+#         # Remove is_dummy_stream parameter
+#         streaming=True  # Add streaming flag
+#     )
+    
+#     def generate():
+#         # Get streaming response
+#         streaming_response = chat_engine.stream_chat(query_str)
+#         for token in streaming_response.response_gen:
+#             yield json.dumps({"response": token}) + "\n"
+
+#     return Response(generate(), mimetype='application/json')
+
+# api for stream response
+@app.route("/stream-query", methods=["POST"])
+def stream_response():
+    data = request.get_json()
+    query_str = data.get("query")
+
+    retriever = PineconeRetriever(
+        vector_store, embed_model, query_mode="semantic_hybrid", similarity_top_k=10
+    )
+    memory = ChatMemoryBuffer.from_defaults(token_limit=1500)
+    
+    # Create index from existing Pinecone vector store
+    index = VectorStoreIndex.from_vector_store(
+        vector_store, 
+        embed_model=embed_model,
+        llm=llm
+    )
+    
+    # Create HyDE query transform
+    hyde = HyDEQueryTransform(include_original=True)
+    
+    # Create base query engine
+    base_query_engine = index.as_query_engine(
+        streaming=True,
+        similarity_top_k=10,
+        chat_mode="context",
+        chat_memory=memory,
+        context_template=qa_prompt
+    )
+    
+    # Wrap with HyDE transformation
+    query_engine = TransformQueryEngine(
+        base_query_engine,
+        query_transform=hyde
+    )
+
+    def generate():
+        streaming_response = query_engine.query(query_str)
+        for token in streaming_response.response_gen:
+            yield json.dumps({"response": token}) + "\n"
+
+    return Response(generate(), mimetype='application/json')
+
 
 # Add new endpoint to get all documents
 @app.route("/documents", methods=["GET"])

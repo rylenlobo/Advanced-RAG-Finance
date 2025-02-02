@@ -16,3 +16,6 @@ pathlib
 asyncio
 flask[async]
 redis
+pymupdf4llm
+llama-index-postprocessor-rankllm-rerank
+rank-llm
