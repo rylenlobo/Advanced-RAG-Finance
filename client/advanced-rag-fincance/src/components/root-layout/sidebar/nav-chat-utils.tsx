@@ -4,7 +4,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarGroup
-} from "../sidebar";
+} from "../../../components/ui/sidebar";
 import { Command, Plus, MessageSquarePlus, Search } from "lucide-react";
 
 interface ChatButtonProps {
@@ -26,7 +26,7 @@ const ChatUtilityButton: React.FC<ChatButtonProps> = ({
         {icon}
         <span className="truncate">{label}</span>
 
-        <div className="flex space-x-1 p-2 items-center bg-border rounded-lg ml-auto scale-75">
+        <div className="ml-auto flex scale-75 items-center space-x-1 rounded-lg bg-border p-2">
           <Command className="size-3" />
           <Plus className="size-2.5" />
           <p className="text-xs">{shortcut}</p>

@@ -3,14 +3,21 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { VariantProps, cva } from "class-variance-authority";
-import { PanelLeft } from "lucide-react";
+import { Menu, PanelLeft, PanelRightClose } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -18,11 +25,12 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from "@/components/ui/tooltip";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
-const SIDEBAR_WIDTH_MOBILE = "500px";
+const SIDEBAR_WIDTH_MOBILE = "80%";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
@@ -34,6 +42,7 @@ type SidebarContext = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  isHidden: boolean;
 };
 
 const SidebarContext = React.createContext<SidebarContext | null>(null);
@@ -116,6 +125,10 @@ const SidebarProvider = React.forwardRef<
     // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? "expanded" : "collapsed";
 
+    const pathname = usePathname();
+    const hiddenPaths = ["/login", "/sign-up"];
+    const isHidden = hiddenPaths.some((path) => pathname.startsWith(path));
+
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
         state,
@@ -124,10 +137,24 @@ const SidebarProvider = React.forwardRef<
         isMobile,
         openMobile,
         setOpenMobile,
-        toggleSidebar
+        toggleSidebar,
+        isHidden
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+      [
+        state,
+        open,
+        setOpen,
+        isMobile,
+        openMobile,
+        setOpenMobile,
+        toggleSidebar,
+        isHidden
+      ]
     );
+
+    if (isHidden) {
+      return <></>;
+    }
 
     return (
       <SidebarContext.Provider value={contextValue}>
@@ -175,7 +202,12 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+    const { isMobile, state, openMobile, setOpenMobile, isHidden } =
+      useSidebar();
+
+    if (isHidden) {
+      return <></>;
+    }
 
     if (collapsible === "none") {
       return (
@@ -194,28 +226,44 @@ const Sidebar = React.forwardRef<
 
     if (isMobile) {
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-          <SheetContent
-            data-sidebar="sidebar"
-            data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-            style={
-              {
-                "--sidebar-width": SIDEBAR_WIDTH_MOBILE
-              } as React.CSSProperties
-            }
-            side={side}
+        <>
+          <div
+            onClick={() => setOpenMobile(!openMobile)}
+            className="w fixed top-0 h-10 p-4"
           >
-            <div className="flex h-full w-full flex-col">{children}</div>
-          </SheetContent>
-        </Sheet>
+            <PanelRightClose className="size-6" />
+          </div>
+          <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+            <SheetContent
+              data-sidebar="sidebar"
+              data-mobile="true"
+              className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+              style={
+                {
+                  "--sidebar-width": SIDEBAR_WIDTH_MOBILE
+                } as React.CSSProperties
+              }
+              side={side}
+            >
+              <VisuallyHidden asChild>
+                <SheetHeader>
+                  <SheetTitle>Mobile Navigation</SheetTitle>
+                  <SheetDescription>
+                    Access navigation menu for mobile devices.
+                  </SheetDescription>
+                </SheetHeader>
+              </VisuallyHidden>
+              <div className="flex h-full w-full flex-col">{children}</div>
+            </SheetContent>
+          </Sheet>
+        </>
       );
     }
 
     return (
       <div
         ref={ref}
-        className="group peer hidden md:block text-sidebar-foreground"
+        className="group peer hidden text-sidebar-foreground md:block"
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
@@ -669,13 +717,8 @@ const SidebarMenuSkeleton = React.forwardRef<
         />
       )}
       <Skeleton
-        className="h-4 flex-1 max-w-[--skeleton-width]"
+        className="h-4 w-full flex-1"
         data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": width
-          } as React.CSSProperties
-        }
       />
     </div>
   );

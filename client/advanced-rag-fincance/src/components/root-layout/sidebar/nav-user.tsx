@@ -1,11 +1,8 @@
-"use client";
-
 import {
   BadgeCheck,
   Bell,
   ChevronsUpDown,
   CreditCard,
-  LogOut,
   Sparkles
 } from "lucide-react";
 
@@ -22,20 +19,21 @@ import {
 import {
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar
+  SidebarMenuItem
 } from "@/components/ui/sidebar";
+import { createClient } from "@/utils/supabase/server/server";
+import LogoutButton from "./logout-button";
 
-export function NavUser({
-  user
-}: {
-  user: {
-    name: string;
-    email: string;
-    avatar: string;
-  };
-}) {
-  const { isMobile } = useSidebar();
+export async function NavUser() {
+  const supabase = await createClient();
+
+  // prettier-ignore
+  const { data: { user } } = await supabase.auth.getUser();
+  // prettier-ignore
+  const userName =user?.user_metadata.first_name + " " + user?.user_metadata.last_name;
+  const userEmail = user?.email;
+  // prettier-ignore
+  const initials =user?.user_metadata.first_name[0] + user?.user_metadata.last_name[0];
 
   return (
     <SidebarMenu>
@@ -49,21 +47,22 @@ export function NavUser({
               <Avatar className="h-10 w-10 rounded-lg">
                 <AvatarImage
                   className="object-cover object-top"
-                  src={user.avatar}
-                  alt={user.name}
+                  src={user?.avatar || " "}
+                  alt={userName}
                 />
-                <AvatarFallback className="rounded-lg">DM</AvatarFallback>
+                <AvatarFallback className="rounded-lg">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{user.name}</span>
-                <span className="truncate text-xs">{user.email}</span>
+                <span className="truncate font-semibold">{userName}</span>
+                <span className="truncate text-xs">{userEmail}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-            side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
           >
@@ -72,14 +71,16 @@ export function NavUser({
                 <Avatar className="h-12 w-12 rounded-lg">
                   <AvatarImage
                     className="object-cover object-top"
-                    src={user.avatar}
-                    alt={user.name}
+                    src={user?.avatar || " "}
+                    alt={userName}
                   />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
+                  <span className="truncate font-semibold">{userName}</span>
+                  <span className="truncate text-xs">{userEmail}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -106,10 +107,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOut />
-              Log out
-            </DropdownMenuItem>
+            <LogoutButton />
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

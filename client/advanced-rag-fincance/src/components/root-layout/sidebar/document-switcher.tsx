@@ -9,18 +9,7 @@ import {
   SidebarMenuItem
 } from "@/components/ui/sidebar";
 
-import { SearchDialog } from "@/components/ui/search-dialog/dialog-search";
-
 export function DocumentSwitcher() {
-  // const { isMobile } = useSidebar();
-  // const [activeTeam, setActiveTeam] = React.useState(teams[0]);
-
-  const [open, setOpen] = React.useState(false);
-
-  function toggleDialog() {
-    setOpen((state) => !state);
-  }
-
   return (
     <>
       <SidebarMenu>
@@ -29,7 +18,6 @@ export function DocumentSwitcher() {
             size="lg"
             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             tooltip="Upload a file or Select a document to chat with"
-            onClick={toggleDialog}
           >
             <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
               <FileText className="size-5" />
@@ -44,12 +32,6 @@ export function DocumentSwitcher() {
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
-      <SearchDialog
-        title="Search your uploaded docuemnts"
-        placeholder="Search uploaded documents..."
-        open={open}
-        setOpen={setOpen}
-      ></SearchDialog>
     </>
   );
 }
