@@ -1,20 +1,25 @@
 import { supabase } from "@/utils/supabase/client/supabase-client";
-import type { PreviousChatsList } from "../types/types";
 
-export async function fetchPreviousChats({
-  pageParam
-}: {
-  pageParam: number;
-}): Promise<{ data: PreviousChatsList[]; nextId: number | null }> {
+export type PreviousChatsList = {
+  id: string;
+  name: string;
+  date?: Date;
+  index: number;
+};
+
+export async function fetchPreviousChats(
+  pageParam: number,
+  doc_id: string | null
+): Promise<{ data: PreviousChatsList[]; nextId: number | null }> {
   const LIMIT = pageParam === 0 ? 22 : 10;
 
   // Fetch total conversation count
   const { count: totalCount, error: countError } = await supabase
     .from("conversations")
     .select("*", { count: "exact", head: true });
+  // .eq("document_id", doc_id);
 
   if (countError) {
-    console.error("Error fetching conversation count:", countError.message);
     throw new Error("Failed to fetch conversation count.");
   }
 
@@ -24,12 +29,10 @@ export async function fetchPreviousChats({
   const { data, error } = await supabase
     .from("conversations")
     .select("*")
-
     .order("created_at", { ascending: true })
     .range(pageParam, pageParam + LIMIT - 1);
 
   if (error) {
-    console.error("Error fetching conversations:", error.message);
     throw new Error("Failed to fetch conversations.");
   }
 

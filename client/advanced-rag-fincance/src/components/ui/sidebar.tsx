@@ -29,7 +29,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = "16rem";
+const SIDEBAR_WIDTH = "16.5rem";
 const SIDEBAR_WIDTH_MOBILE = "80%";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
@@ -229,7 +229,7 @@ const Sidebar = React.forwardRef<
         <>
           <div
             onClick={() => setOpenMobile(!openMobile)}
-            className="w fixed top-0 h-10 p-4"
+            className="fixed top-0 z-10 flex h-14 w-dvw items-center bg-sidebar p-4"
           >
             <PanelRightClose className="size-6" />
           </div>
@@ -237,7 +237,7 @@ const Sidebar = React.forwardRef<
             <SheetContent
               data-sidebar="sidebar"
               data-mobile="true"
-              className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+              className="w-[--sidebar-width]  p-0 text-sidebar-foreground [&>button]:hidden"
               style={
                 {
                   "--sidebar-width": SIDEBAR_WIDTH_MOBILE
@@ -597,12 +597,21 @@ const SidebarMenuButton = React.forwardRef<
       size = "default",
       tooltip,
       className,
+      onClick,
       ...props
     },
     ref
   ) => {
     const Comp = asChild ? Slot : "button";
-    const { isMobile, state } = useSidebar();
+    const { isMobile, state, setOpenMobile } = useSidebar();
+
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+      onClick?.(event);
+      // Close the sidebar when clicked on mobile/tablet
+      if (isMobile) {
+        setOpenMobile(false);
+      }
+    };
 
     const button = (
       <Comp
@@ -611,6 +620,7 @@ const SidebarMenuButton = React.forwardRef<
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+        onClick={handleClick}
         {...props}
       />
     );

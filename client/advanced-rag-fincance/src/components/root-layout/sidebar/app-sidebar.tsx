@@ -12,7 +12,7 @@ import {
 
 import NavChatUtils from "./nav-chat-utils";
 import { NavUser } from "./nav-user";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -23,9 +23,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarHeader>
         <SidebarContent>
           <NavChatUtils />
-          <ScrollArea>
-            <NavPreviousChatsList />
-          </ScrollArea>
+
+          <NavPreviousChatsList />
+        
         </SidebarContent>
         <SidebarFooter>
           <NavUser />

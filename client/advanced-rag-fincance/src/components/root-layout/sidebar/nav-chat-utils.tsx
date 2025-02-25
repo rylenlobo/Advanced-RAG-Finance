@@ -6,27 +6,28 @@ import {
   SidebarGroup
 } from "../../../components/ui/sidebar";
 import { Command, Plus, MessageSquarePlus, Search } from "lucide-react";
+import Link from "next/link";
 
 interface ChatButtonProps {
   tooltip: string;
-  icon: React.ReactNode;
+  Icon: React.ElementType;
   label: string;
   shortcut: string;
 }
 
 const ChatUtilityButton: React.FC<ChatButtonProps> = ({
   tooltip,
-  icon,
+  Icon,
   label,
   shortcut
 }) => {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton tooltip={tooltip} className="pr-0">
-        {icon}
-        <span className="truncate">{label}</span>
+        <Icon size={5} />
+        <span className="text-base lg:text-sm">{label}</span>
 
-        <div className="ml-auto flex scale-75 items-center space-x-1 rounded-lg bg-border p-2">
+        <div className="ml-auto hidden scale-75 items-center space-x-1 rounded-lg bg-border p-2 lg:flex">
           <Command className="size-3" />
           <Plus className="size-2.5" />
           <p className="text-xs">{shortcut}</p>
@@ -38,12 +39,14 @@ const ChatUtilityButton: React.FC<ChatButtonProps> = ({
 
 function NewChatButton() {
   return (
-    <ChatUtilityButton
-      tooltip="New Chat"
-      icon={<MessageSquarePlus />}
-      label="New Chat"
-      shortcut="N"
-    />
+    <Link href="/">
+      <ChatUtilityButton
+        tooltip="New Chat"
+        Icon={MessageSquarePlus}
+        label="New Chat"
+        shortcut="N"
+      />
+    </Link>
   );
 }
 
@@ -51,7 +54,7 @@ function SearchChatsButton() {
   return (
     <ChatUtilityButton
       tooltip="Search"
-      icon={<Search />}
+      Icon={Search}
       label="Search"
       shortcut="K"
     />
