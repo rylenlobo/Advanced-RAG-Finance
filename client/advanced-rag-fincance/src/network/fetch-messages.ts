@@ -1,15 +1,16 @@
 import { supabase } from "@/utils/supabase/client/supabase-client";
 
-type Messages = {
+export type Message = {
   data?: Date;
   content: string;
   role: string;
+  id: string;
 };
 
 export async function fetchMessages(
   pageParam: number,
   conversation_id: string
-): Promise<{ data: Messages[]; nextId: number | null }> {
+): Promise<{ data: Message[]; nextId: number | null }> {
   const LIMIT = 12;
 
   // Fetch total conversation count
@@ -27,7 +28,7 @@ export async function fetchMessages(
   // Fetch paginated conversation data
   const { data, error } = await supabase
     .from("messages")
-    .select("*")
+    .select("id,role,content")
     .eq("conversation_id", conversation_id)
     .order("created_at", { ascending: false })
     .range(pageParam, pageParam + LIMIT - 1);

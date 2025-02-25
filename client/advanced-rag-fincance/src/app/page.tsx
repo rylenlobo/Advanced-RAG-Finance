@@ -16,13 +16,13 @@ export default function ChatInterface() {
     <div className="container mx-auto flex min-h-dvh max-w-3xl items-center justify-center p-4">
       <div className="mt-auto w-full space-y-8 lg:mt-0">
         {/* Welcome Messages */}
-        <div className="space-y-4">
-          <h1 className="mb-12 text-5xl font-thin duration-1000 animate-in fade-in slide-in-from-top-10 md:text-6xl">
+        <div>
+          <h1 className="mb-10 text-5xl font-thin duration-1000 animate-in fade-in slide-in-from-top-10 md:text-6xl">
             Hi there,
             <br />
             How can I assist you today?
           </h1>
-          <p className="max-w-2xl text-muted-foreground duration-1000 animate-in fade-in-0 md:text-base">
+          <p className="max-w-2xl text-muted-foreground duration-1000 animate-in fade-in-15 md:text-base">
             You can ask me anything! Whether you need financial insights,
             analysis, or recommendations, I&apos;m here to help. Let&apos;s get
             started!
@@ -30,12 +30,12 @@ export default function ChatInterface() {
         </div>
 
         {/* Suggestion Cards */}
-        <div className="flex flex-col items-center gap-5 duration-1000 animate-in fade-in-0 lg:h-28 lg:flex-row">
+        <div className="flex flex-col items-center gap-5 duration-1000 animate-in fade-in-15 lg:h-28 lg:flex-row">
           {suggestions.map((suggestion, index) => (
             <Button
               key={index}
               variant="outline"
-              className="flex h-auto w-full flex-col items-start justify-between whitespace-normal break-words rounded-xl px-4 py-3 text-left text-sm font-medium leading-normal transition-all duration-300 hover:-translate-y-1 hover:animate-in md:w-3/4 lg:h-full"
+              className="flex h-auto w-full flex-col items-start justify-between whitespace-normal break-words rounded-xl px-4 py-3 text-left text-base leading-normal text-secondary-foreground transition-all duration-300 hover:-translate-y-1 hover:animate-in md:w-3/4 lg:h-full"
             >
               {suggestion}
 

@@ -227,11 +227,8 @@ const Sidebar = React.forwardRef<
     if (isMobile) {
       return (
         <>
-          <div
-            onClick={() => setOpenMobile(!openMobile)}
-            className="fixed top-0 z-10 flex h-14 w-dvw items-center bg-sidebar p-4"
-          >
-            <PanelRightClose className="size-6" />
+          <div className="fixed top-0 z-10 flex h-14 w-dvw items-center bg-sidebar p-4">
+            <SidebarTrigger />
           </div>
           <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
             <SheetContent
@@ -327,7 +324,6 @@ const SidebarTrigger = React.forwardRef<
       {...props}
     >
       <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );
 });
@@ -602,16 +598,8 @@ const SidebarMenuButton = React.forwardRef<
     },
     ref
   ) => {
+    const { state } = useSidebar();
     const Comp = asChild ? Slot : "button";
-    const { isMobile, state, setOpenMobile } = useSidebar();
-
-    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-      onClick?.(event);
-      // Close the sidebar when clicked on mobile/tablet
-      if (isMobile) {
-        setOpenMobile(false);
-      }
-    };
 
     const button = (
       <Comp
@@ -620,7 +608,7 @@ const SidebarMenuButton = React.forwardRef<
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-        onClick={handleClick}
+        onClick={onClick}
         {...props}
       />
     );
@@ -641,7 +629,7 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
-          hidden={state !== "collapsed" || isMobile}
+          hidden={state !== "collapsed"}
           {...tooltip}
         />
       </Tooltip>

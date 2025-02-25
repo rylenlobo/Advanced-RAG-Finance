@@ -4,7 +4,6 @@ type Document = {
   id: string;
   file_name: string;
   title: string;
-  description: string;
   created_at: Date;
 };
 

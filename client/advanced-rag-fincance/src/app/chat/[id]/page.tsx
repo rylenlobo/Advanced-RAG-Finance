@@ -1,26 +1,19 @@
 "use client";
 
-import { ArrowRight, Bot, Loader, User } from "lucide-react";
+import { ArrowRight, Loader } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AnimatePresence, motion } from "framer-motion";
-import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useRef } from "react";
+
+import { useEffect } from "react";
 import { fetchMessages } from "@/network/fetch-messages";
 import { useParams } from "next/navigation";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
-import Markdown from "react-markdown";
+import { Message } from "../components/message";
 
 export default function Page() {
   const { id } = useParams<{ id: string }>();
-  const bottomRef = useRef<HTMLDivElement | null>(null);
-
-  // const bottomRef = useCallback((element: HTMLDivElement | null) => {
-  //   if (element) {
-  //     element.scrollIntoView({ behavior: "smooth" });
-  //   }
-  // }, []);
 
   const { ref: topOfMessagesRef, inView } = useInView();
   const { data, error, status, fetchNextPage, isFetchingNextPage } =
@@ -39,19 +32,12 @@ export default function Page() {
     }
   }, [inView, fetchNextPage]);
 
-  useEffect(() => {
-    setTimeout(() => {
-      if (bottomRef.current) {
-        bottomRef.current.scrollIntoView({ behavior: "smooth" });
-      }
-    }, 1500);
-  }, []);
-
   return (
-    <div className="container h-dvh min-w-full">
-      {/* Messages Container */}
-
+    <div className="h-dvh w-screen lg:container lg:min-w-full">
+      {/* Error Message */}
       {status === "error" && error.message}
+
+      {/* Loading State */}
       {status === "pending" && (
         <div className="flex h-full w-full items-center justify-center">
           <Loader className="animate-spin" />
@@ -60,42 +46,10 @@ export default function Page() {
 
       {/* Messages */}
       <div className="flex h-full w-full justify-center">
-        <div className="flex flex-1 flex-col-reverse space-y-8 overflow-y-auto px-4 pb-24">
+        <div className="flex w-full flex-1 flex-col-reverse gap-6 overflow-y-auto px-4 pb-24">
           {status === "success" &&
-            messages?.map((message, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "flex w-full items-start gap-3 md:gap-4 max-w-3xl mx-auto ",
-                  message.role === "user" ? "justify-end" : "justify-start"
-                )}
-              >
-                {/* User/Assistant Avatar */}
-                {message.role === "assistant" && (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md">
-                    <Bot className="h-5 w-5" />
-                  </div>
-                )}
-
-                {/* Chat Bubble */}
-                <div
-                  className={cn(
-                    "px-4 py-2 text-sm md:text-base shadow-md",
-                    message.role === "assistant"
-                      ? "w-full"
-                      : "bg-secondary max-w-[75%] rounded-lg "
-                  )}
-                >
-                  <Markdown>{message.content}</Markdown>
-                </div>
-
-                {/* User Avatar (only for user messages) */}
-                {message.role === "user" && (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted shadow-md">
-                    <User className="h-5 w-5" />
-                  </div>
-                )}
-              </div>
+            messages?.map((message) => (
+              <Message key={message.id} message={message} />
             ))}
           <div
             ref={topOfMessagesRef}
@@ -106,12 +60,12 @@ export default function Page() {
         </div>
       </div>
 
+      {/* Message Input */}
       <div className="relative mx-auto max-w-4xl">
         <div className="fixed bottom-0 w-full max-w-4xl rounded-t-xl bg-secondary px-4 py-3 lg:rounded-none lg:bg-background">
           <InputAI />
         </div>
       </div>
-      <div ref={bottomRef} />
     </div>
   );
 }
