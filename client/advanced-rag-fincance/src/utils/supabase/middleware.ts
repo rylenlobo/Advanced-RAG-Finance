@@ -31,9 +31,22 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: DO NOT REMOVE auth.getUser()
 
+  const selectedDocumentDetails =
+    request.cookies.get("selectedDocumentDetails")?.value || null;
+
+  console.log(selectedDocumentDetails);
+
   const {
     data: { user }
   } = await supabase.auth.getUser();
+
+  const { count, error } = await supabase
+    .from("documents")
+    .select("*", { count: "exact", head: true });
+
+  if (error) {
+    console.error("Error fetching documents count:", error);
+  }
 
   // Define public routes accessible without a logged-in user
   const publicPaths = [
@@ -61,6 +74,23 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // If a user is logged in but has no documents, redirect to /documents
+  if (user && count === 0 && request.nextUrl.pathname !== "/documents") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/documents";
+    return NextResponse.redirect(url);
+  }
+
+  if (
+    user &&
+    count !== 0 &&
+    !selectedDocumentDetails &&
+    request.nextUrl.pathname !== "/documents"
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/documents";
+    return NextResponse.redirect(url);
+  }
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:
   // 1. Pass the request in it, like so:

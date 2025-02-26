@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { VariantProps, cva } from "class-variance-authority";
-import { Menu, PanelLeft, PanelRightClose } from "lucide-react";
+import { PanelLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -126,7 +126,7 @@ const SidebarProvider = React.forwardRef<
     const state = open ? "expanded" : "collapsed";
 
     const pathname = usePathname();
-    const hiddenPaths = ["/login", "/sign-up"];
+    const hiddenPaths = ["/login", "/sign-up", "/documents"];
     const isHidden = hiddenPaths.some((path) => pathname.startsWith(path));
 
     const contextValue = React.useMemo<SidebarContext>(

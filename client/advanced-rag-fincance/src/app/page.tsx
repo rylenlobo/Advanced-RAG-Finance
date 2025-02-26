@@ -35,7 +35,7 @@ export default function ChatInterface() {
             <Button
               key={index}
               variant="outline"
-              className="flex h-auto w-full flex-col items-start justify-between whitespace-normal break-words rounded-xl px-4 py-3 text-left text-base leading-normal text-secondary-foreground transition-all duration-300 hover:-translate-y-1 hover:animate-in md:w-3/4 lg:h-full"
+              className="flex h-auto w-full flex-col items-start justify-between whitespace-normal break-words rounded-xl px-4 py-3 text-left text-base leading-normal text-secondary-foreground transition-all duration-300 md:w-3/4 lg:h-full"
             >
               {suggestion}
 

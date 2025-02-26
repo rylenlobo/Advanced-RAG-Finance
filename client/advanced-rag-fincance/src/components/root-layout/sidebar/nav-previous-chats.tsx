@@ -40,8 +40,7 @@ import { useEffect } from "react";
 import { useInView } from "react-intersection-observer";
 import Link from "next/link";
 import { motion } from "framer-motion";
-
-import { useSearchParams } from "next/navigation";
+import useDocumentStore from "@/store/currentDocStore";
 
 function SkeletonLoader() {
   return (
@@ -57,14 +56,14 @@ function SkeletonLoader() {
 
 export function NavPreviousChatsList() {
   const { ref: endOfPrevChatsListRef, inView } = useInView();
-  const searchParams = useSearchParams();
-  const doc_id = searchParams.get("doc_id");
+  const { selectedDocumentDetails } = useDocumentStore();
 
   const { data, error, status, fetchNextPage, isFetchingNextPage } =
     useInfiniteQuery({
-      queryKey: ["conversations"],
+      queryKey: ["conversations", selectedDocumentDetails?.id],
       initialPageParam: 0,
-      queryFn: ({ pageParam }) => fetchPreviousChats(pageParam, doc_id),
+      queryFn: ({ pageParam }) =>
+        fetchPreviousChats(pageParam, selectedDocumentDetails?.id),
       getNextPageParam: (lastPage) => lastPage.nextId
     });
 

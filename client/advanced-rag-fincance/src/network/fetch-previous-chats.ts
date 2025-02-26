@@ -9,7 +9,7 @@ export type PreviousChatsList = {
 
 export async function fetchPreviousChats(
   pageParam: number,
-  doc_id: string | null
+  doc_id: string | undefined
 ): Promise<{ data: PreviousChatsList[]; nextId: number | null }> {
   const LIMIT = pageParam === 0 ? 22 : 10;
 
@@ -29,6 +29,7 @@ export async function fetchPreviousChats(
   const { data, error } = await supabase
     .from("conversations")
     .select("*")
+    .eq("document_id", doc_id)
     .order("created_at", { ascending: true })
     .range(pageParam, pageParam + LIMIT - 1);
 

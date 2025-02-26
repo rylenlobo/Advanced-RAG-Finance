@@ -1,6 +1,6 @@
 import { supabase } from "@/utils/supabase/client/supabase-client";
 
-type Document = {
+export type Document = {
   id: string;
   file_name: string;
   title: string;
