@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 
 const LogoutButton = () => {
   const router = useRouter();
@@ -17,6 +18,7 @@ const LogoutButton = () => {
 
     if (user) {
       await supabase.auth.signOut();
+      Cookies.remove("selectedDocumentDetails");
     }
 
     toast.success("Logged Out Succesfully");

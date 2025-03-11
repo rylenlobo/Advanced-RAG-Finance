@@ -13,8 +13,6 @@ import {
 import NavChatUtils from "./nav-chat-utils";
 import { NavUser } from "./nav-user";
 
-
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <SidebarProvider>
@@ -24,6 +22,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarHeader>
         <SidebarContent>
           <NavChatUtils />
+
           <NavPreviousChatsList />
         </SidebarContent>
         <SidebarFooter>

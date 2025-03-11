@@ -1,28 +1,28 @@
 "use client";
 
-import { ArrowRight, MessageSquareText } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 
 export default function ChatInterface() {
-  const suggestions = [
-    "What are the key financial trends in the report?",
-    "Can you summarize the investment opportunities discussed?",
-    "How does this document explain risk management strategies?"
-  ];
+  // const suggestions = [
+  //   "What are the key financial trends in the report?",
+  //   "Can you summarize the investment opportunities discussed?",
+  //   "How does this document explain risk management strategies?"
+  // ];
 
   return (
     <div className="container mx-auto flex min-h-dvh max-w-3xl items-center justify-center p-4">
-      <div className="mt-auto w-full space-y-8 lg:mt-0">
+      <div className="mt-auto w-full space-y-8 duration-500 animate-in fade-in-0 lg:mt-0">
         {/* Welcome Messages */}
-        <div>
-          <h1 className="mb-10 text-5xl font-thin duration-1000 animate-in fade-in slide-in-from-top-10 md:text-6xl">
+        <div className="duration-500 animate-in fade-in-0 slide-in-from-bottom-10">
+          <h1 className="mb-10 text-5xl font-thin md:text-6xl">
             Hi there,
             <br />
             How can I assist you today?
           </h1>
-          <p className="max-w-2xl text-muted-foreground duration-1000 animate-in fade-in-15 md:text-base">
+          <p className="max-w-2xl text-muted-foreground md:text-base">
             You can ask me anything! Whether you need financial insights,
             analysis, or recommendations, I&apos;m here to help. Let&apos;s get
             started!
@@ -30,7 +30,7 @@ export default function ChatInterface() {
         </div>
 
         {/* Suggestion Cards */}
-        <div className="flex flex-col items-center gap-5 duration-1000 animate-in fade-in-15 lg:h-28 lg:flex-row">
+        {/* <div className="flex flex-col items-center gap-5 duration-1000 animate-in fade-in-15 lg:h-28 lg:flex-row">
           {suggestions.map((suggestion, index) => (
             <Button
               key={index}
@@ -42,17 +42,14 @@ export default function ChatInterface() {
               <MessageSquareText className="text-muted-foreground" />
             </Button>
           ))}
-        </div>
+        </div> */}
 
         {/* Search Input */}
-        <motion.div
-          layoutId="search-input"
-          className="relative duration-1000 animate-in fade-in slide-in-from-bottom-10"
-        >
+        <motion.div layoutId="search-input" className="relative">
           <Input
             type="text"
             placeholder="Ask whatever you want..."
-            className="bg-bg-secondary h-14 w-full rounded-full px-4 py-4"
+            className="h-14 w-full rounded-full bg-secondary px-4 py-4"
           />
           <Button
             size="icon"

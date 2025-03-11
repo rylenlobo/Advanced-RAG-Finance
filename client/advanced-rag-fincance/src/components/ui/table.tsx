@@ -1,18 +1,21 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { Card, CardContent } from "./card";
 
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-x-auto">
-    <table
-      ref={ref}
-      className={cn("w-full caption-bottom text-sm", className)}
-      {...props}
-    />
-  </div>
+  <Card className="relative w-full overflow-x-auto">
+    <CardContent>
+      <table
+        ref={ref}
+        className={cn("w-full caption-bottom text-sm", className)}
+        {...props}
+      />
+    </CardContent>
+  </Card>
 ));
 Table.displayName = "Table";
 

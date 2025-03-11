@@ -78,23 +78,22 @@ export function Message({ message }: { message: Message }): React.ReactNode {
       hr: {
         component: Separator
       }
-    },
-    forceBlock: true
+    }
   };
 
   return (
     <div
       className={cn(
-        "flex w-full items-start  max-w-4xl mx-auto ",
+        "flex w-full items-start  max-w-3xl mx-auto animate-in fade-in-0 duration-200",
         message.role === "user" ? "justify-end" : "justify-start"
       )}
     >
       {/* Chat Bubble */}
       <div
         className={cn(
-          "px-4 py-2 mt-4",
+          "px-4 py-2 ",
           message.role === "assistant"
-            ? "w-full"
+            ? "w-full pl-0 mb-6"
             : "bg-secondary max-w-[75%]  rounded-lg "
         )}
       >

@@ -39,13 +39,13 @@ import { PreviousChatsList } from "../types/types";
 import { useEffect } from "react";
 import { useInView } from "react-intersection-observer";
 import Link from "next/link";
-import { motion } from "framer-motion";
+
 import useDocumentStore from "@/store/currentDocStore";
 
 function SkeletonLoader() {
   return (
     <>
-      {Array.from({ length: 22 }).map((_, index) => (
+      {Array.from({ length: 30 }).map((_, index) => (
         <SidebarMenuItem key={index}>
           <SidebarMenuSkeleton />
         </SidebarMenuItem>
@@ -90,19 +90,10 @@ export function NavPreviousChatsList() {
             {status === "success" &&
               data.pages.map((page, index) => (
                 <div key={index}>
-                  {page.data.map(({ name, id }, itemIndex) => (
-                    <motion.div
-                      key={id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{
-                        delay: itemIndex * 0.05,
-                        duration: 0.5,
-                        ease: "easeInOut"
-                      }}
-                    >
+                  {page.data.map(({ name, id }) => (
+                    <div key={id}>
                       <PreviousChat id={id} name={name} />
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
               ))}
@@ -122,7 +113,7 @@ export function NavPreviousChatsList() {
 function PreviousChat({ id, name }: PreviousChatsList) {
   const { isMobile } = useSidebar();
   return (
-    <SidebarMenuItem key={id}>
+    <SidebarMenuItem key={id} className="animate-in fade-in-0 duration-200">
       <SidebarMenuButton asChild className="py-5 lg:py-0">
         <Link href={`/chat/${id}`}>
           <MessageSquare />

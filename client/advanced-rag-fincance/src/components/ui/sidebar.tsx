@@ -260,7 +260,7 @@ const Sidebar = React.forwardRef<
     return (
       <div
         ref={ref}
-        className="group peer hidden text-sidebar-foreground md:block"
+        className="group peer hidden text-sidebar-foreground md:block animate-in fade-in-0 duration-200"
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
@@ -696,10 +696,10 @@ const SidebarMenuSkeleton = React.forwardRef<
     showIcon?: boolean;
   }
 >(({ className, showIcon = false, ...props }, ref) => {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`;
-  }, []);
+  // // Random width between 50 to 90%.
+  // const width = React.useMemo(() => {
+  //   return `${Math.floor(Math.random() * 40) + 50}%`;
+  // }, []);
 
   return (
     <div

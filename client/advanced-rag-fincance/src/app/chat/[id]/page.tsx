@@ -14,8 +14,7 @@ import { Message } from "../components/message";
 
 export default function Page() {
   const { id } = useParams<{ id: string }>();
-
-  const { ref: topOfMessagesRef, inView } = useInView();
+  const { ref: topOfMessagesRef, inView } = useInView({ threshold: 1 });
   const { data, error, status, fetchNextPage, isFetchingNextPage } =
     useInfiniteQuery({
       queryKey: ["messages", id],
@@ -33,44 +32,39 @@ export default function Page() {
   }, [inView, fetchNextPage]);
 
   return (
-    <div className="h-dvh w-screen lg:container lg:min-w-full">
+    <div className="flex h-dvh w-screen min-w-full flex-col lg:container">
       {/* Error Message */}
-      {status === "error" && error.message}
-
-      {/* Loading State */}
-      {status === "pending" && (
-        <div className="flex h-full w-full items-center justify-center">
-          <Loader className="animate-spin" />
-        </div>
+      {status === "error" && (
+        <div className="text-red-500">{error.message}</div>
       )}
 
-      {/* Messages */}
-      <div className="flex h-full w-full justify-center">
-        <div className="flex w-full flex-1 flex-col-reverse gap-6 overflow-y-auto px-4 pb-24">
+      {/* Chat Container */}
+      <div className="flex w-full flex-1 flex-col overflow-hidden duration-200 animate-in fade-in-0">
+        {/* Messages Scrollable Area */}
+
+        <div className="flex w-full flex-1 flex-col-reverse gap-5 overflow-y-auto px-4 pb-4">
           {status === "success" &&
             messages?.map((message) => (
               <Message key={message.id} message={message} />
             ))}
           <div
             ref={topOfMessagesRef}
-            className="flex h-11 w-full justify-center pt-11"
+            className="flex h-11 w-full justify-center py-10"
           >
             {isFetchingNextPage && <Loader className="size-5 animate-spin" />}
           </div>
         </div>
       </div>
 
-      {/* Message Input */}
-      <div className="relative mx-auto max-w-4xl">
-        <div className="fixed bottom-0 w-full max-w-4xl rounded-t-xl bg-secondary px-4 py-3 lg:rounded-none lg:bg-background">
-          <InputAI />
-        </div>
+      {/* Message Input Fixed at Bottom */}
+      <div className="mx-auto w-full max-w-4xl rounded-t-xl bg-secondary px-4 py-5 lg:bg-background">
+        <InputAI />
       </div>
     </div>
   );
 }
 
-function InputAI({}) {
+function InputAI() {
   return (
     <AnimatePresence>
       <motion.div

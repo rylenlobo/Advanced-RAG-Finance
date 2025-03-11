@@ -19,7 +19,6 @@ import { signUpUser } from "../actions/signup-action";
 import { Loader2 } from "lucide-react";
 import { Result } from "../../auth-types";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 function SignUpForm() {
@@ -35,10 +34,8 @@ function SignUpForm() {
     mode: "onTouched"
   });
 
-  const { formState, reset } = form;
+  const { formState } = form;
   const isSubmitting = formState.isSubmitting;
-
-  const { push } = useRouter();
 
   const onSubmit: SubmitHandler<SignUpInput> = async (data) => {
     const result: Result = await signUpUser(data);
