@@ -6,6 +6,7 @@ import { ReactQueryClientProvider } from "@/components/react-query-provider";
 import React from "react";
 import { AppSidebar } from "@/components/root-layout/sidebar/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { CheckDocProcessing } from "./documents/components/check-doc-processing";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,18 +30,25 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      {/* <head>
+        <script
+          crossOrigin="anonymous"
+          src="//unpkg.com/react-scan/dist/auto.global.js"
+        />
+      </head> */}
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ReactQueryClientProvider>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
             <div className="flex">
+              <CheckDocProcessing />
               <aside>
                 <AppSidebar />
               </aside>
               <main className="flex-1">{children}</main>
             </div>
-            <Toaster richColors position="top-center" />
+            <Toaster richColors />
           </ThemeProvider>
         </ReactQueryClientProvider>
       </body>

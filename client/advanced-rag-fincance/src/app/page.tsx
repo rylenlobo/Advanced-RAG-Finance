@@ -6,12 +6,6 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 
 export default function ChatInterface() {
-  // const suggestions = [
-  //   "What are the key financial trends in the report?",
-  //   "Can you summarize the investment opportunities discussed?",
-  //   "How does this document explain risk management strategies?"
-  // ];
-
   return (
     <div className="container mx-auto flex min-h-dvh max-w-3xl items-center justify-center p-4">
       <div className="mt-auto w-full space-y-8 duration-500 animate-in fade-in-0 lg:mt-0">
@@ -28,21 +22,6 @@ export default function ChatInterface() {
             started!
           </p>
         </div>
-
-        {/* Suggestion Cards */}
-        {/* <div className="flex flex-col items-center gap-5 duration-1000 animate-in fade-in-15 lg:h-28 lg:flex-row">
-          {suggestions.map((suggestion, index) => (
-            <Button
-              key={index}
-              variant="outline"
-              className="flex h-auto w-full flex-col items-start justify-between whitespace-normal break-words rounded-xl px-4 py-3 text-left text-base leading-normal text-secondary-foreground transition-all duration-300 md:w-3/4 lg:h-full"
-            >
-              {suggestion}
-
-              <MessageSquareText className="text-muted-foreground" />
-            </Button>
-          ))}
-        </div> */}
 
         {/* Search Input */}
         <motion.div layoutId="search-input" className="relative">

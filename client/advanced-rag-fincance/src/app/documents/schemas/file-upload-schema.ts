@@ -8,13 +8,17 @@ export const documentUploadSchema = z.object({
       : z
           .instanceof(FileList)
           .nullable()
-          .refine((file) => file !== null && file.length === 1, {
+          .refine((file) => file !== null && file.length > 0, {
             message: "File is required"
+          })
+          .refine((file) => file && file.length === 1, {
+            message: "Please upload only one file"
           })
           .refine(
             (file) => {
+              if (!file || !file[0]) return false;
               const allowedTypes = ["application/pdf"];
-              return file !== null && allowedTypes.includes(file[0].type);
+              return allowedTypes.includes(file[0].type);
             },
             { message: "Invalid file type" }
           )

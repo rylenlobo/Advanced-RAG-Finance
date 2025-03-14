@@ -2,9 +2,10 @@ import { supabase } from "@/utils/supabase/client/supabase-client";
 
 export type Document = {
   id: string;
-  file_name: string;
+  file_name?: string;
   title: string;
-  created_at: Date;
+  created_at?: Date;
+  status?: "processed" | "processing";
 };
 
 export async function fetchDocuments(): Promise<{ data: Document[] }> {
