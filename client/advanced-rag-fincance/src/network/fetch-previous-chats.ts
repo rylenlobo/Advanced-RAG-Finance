@@ -30,7 +30,7 @@ export async function fetchPreviousChats(
     .from("conversations")
     .select("*")
     .eq("document_id", doc_id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .range(pageParam, pageParam + LIMIT - 1);
 
   if (error) {

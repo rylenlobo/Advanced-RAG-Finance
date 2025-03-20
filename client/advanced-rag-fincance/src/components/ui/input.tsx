@@ -13,26 +13,26 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         )}
         ref={ref}
         {...props}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            const form = e.currentTarget.form;
-            if (form) {
-              // Find all focusable elements in the form
-              const elements = Array.from(
-                form.querySelectorAll("input, button, select, textarea")
-              ).filter(
-                (el) =>
-                  !el.hasAttribute("disabled") &&
-                  el.getAttribute("tabindex") !== "-1"
-              );
-              const index = elements.indexOf(e.currentTarget);
-              if (index > -1 && index + 1 < elements.length) {
-                (elements[index + 1] as HTMLElement).focus();
-              }
-            }
-          }
-        }}
+        // onKeyDown={(e) => {
+        //   if (e.key === "Enter") {
+        //     e.preventDefault();
+        //     const form = e.currentTarget.form;
+        //     if (form) {
+        //       // Find all focusable elements in the form
+        //       const elements = Array.from(
+        //         form.querySelectorAll("input, button, select, textarea")
+        //       ).filter(
+        //         (el) =>
+        //           !el.hasAttribute("disabled") &&
+        //           el.getAttribute("tabindex") !== "-1"
+        //       );
+        //       const index = elements.indexOf(e.currentTarget);
+        //       if (index > -1 && index + 1 < elements.length) {
+        //         (elements[index + 1] as HTMLElement).focus();
+        //       }
+        //     }
+        //   }
+        // }}
       />
     );
   }

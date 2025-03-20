@@ -81,6 +81,25 @@ export function Message({ message }: { message: Message }): React.ReactNode {
     }
   };
 
+  if (message.isLoading) {
+    return (
+      <div
+        className={cn(
+          "flex w-full items-start max-w-3xl mx-auto animate-in fade-in-0 duration-200",
+          "justify-start"
+        )}
+      >
+        <div className="mb-6 w-full px-4 py-2 pl-0">
+          <div className="flex items-center space-x-2">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400"></div>
+            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400 delay-150"></div>
+            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400 delay-300"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(

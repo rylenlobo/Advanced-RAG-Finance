@@ -22,7 +22,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarHeader>
         <SidebarContent>
           <NavChatUtils />
-
           <NavPreviousChatsList />
         </SidebarContent>
         <SidebarFooter>

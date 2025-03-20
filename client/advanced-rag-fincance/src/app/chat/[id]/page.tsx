@@ -11,6 +11,7 @@ import { useParams } from "next/navigation";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
 import { Message } from "../components/message";
+import InputAI from "@/components/chat-input";
 
 export default function Page() {
   const { id } = useParams<{ id: string }>();
@@ -61,29 +62,5 @@ export default function Page() {
         <InputAI />
       </div>
     </div>
-  );
-}
-
-function InputAI() {
-  return (
-    <AnimatePresence>
-      <motion.div
-        viewport={{ once: true }}
-        layoutId="search-input"
-        className="relative"
-      >
-        <Input
-          type="text"
-          placeholder="Ask whatever you want..."
-          className="h-14 w-full rounded-full bg-secondary px-4 py-4"
-        />
-        <Button
-          size="icon"
-          className="absolute bottom-0 right-3 top-1/2 -translate-y-1/2 rounded-full"
-        >
-          <ArrowRight className="h-4 w-4 md:h-5 md:w-5" />
-        </Button>
-      </motion.div>
-    </AnimatePresence>
   );
 }

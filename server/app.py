@@ -1,70 +1,76 @@
-from flask import Flask, request, Response, jsonify
+from flask import Flask, request, Response, jsonify, session
 from flask_cors import CORS
-from dotenv import load_dotenv
-import os
-import datetime
-import json
 from supabase import create_client
 from werkzeug.utils import secure_filename
 from llama_index.core import Settings
-# from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.ollama import OllamaEmbedding
-from llama_index.core import Document
-from llama_index.core.node_parser import MarkdownNodeParser
-from llama_index.core.extractors import SummaryExtractor, QuestionsAnsweredExtractor
-from llama_index.core.schema import MetadataMode
-from llama_index.core.ingestion import IngestionPipeline
-from llama_index.vector_stores.pinecone import PineconeVectorStore
-from llama_index.core.retrievers import BaseRetriever
-from llama_index.core import QueryBundle, PromptTemplate
-from llama_index.core.vector_stores import VectorStoreQuery
-from llama_index.core.schema import NodeWithScore
-# from llama_index.core.chat_engine import ContextChatEngine
-# from llama_index.core.memory import ChatMemoryBuffer
-# from llama_index.core.postprocessor import SentenceTransformerRerank
-from pinecone import Pinecone, ServerlessSpec
-import nest_asyncio
-from typing import List, Optional, Any
+from llama_index.llms.gemini import Gemini
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from pinecone import Pinecone
+import os
+import threading
 import multiprocessing
-import signal
-import sys
+import logging
+from dotenv import load_dotenv
+import uuid
 
-from marker.converters.pdf import PdfConverter
-from marker.models import create_model_dict
-from marker.config.parser import ConfigParser
-import time
-
+# Import from our modules
+from src.config import (
+    SUPABASE_URL, SUPABASE_KEY, PINECONE_API_KEY,
+    UPLOAD_FOLDER, CORS_ORIGINS, HOST, PORT, allowed_file
+)
+from src.services.document_service import DocumentProcessor, get_processing_tasks
+from src.services.query_service import QueryService
+from src.utils.retriever import PineconeRetriever
 
 # Load environment variables
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
+
+# Initialize Flask app
+app = Flask(__name__)
+app.secret_key = os.getenv(
+    'FLASK_SECRET_KEY', 'default_secret_key_for_development')
+
+# Configure CORS
+CORS(app, origins=CORS_ORIGINS, supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # Initialize Supabase client
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-app = Flask(__name__)
+# Initialize Pinecone
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
+pc = Pinecone(api_key=PINECONE_API_KEY)
 
-# Configure CORS more explicitly to handle preflight requests
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True,
-     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+# Initialize LLM and embedding model
+llm = Ollama(
+    model="llama3.2:3b-instruct-q8_0",
+    temprature=0,
+    request_timeout=3000,
+)
 
-# Configure upload folder
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'pdf'}
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+query_llm = Gemini(
+    model="models/gemini-2.0-flash",
+    api_key=GOOGLE_API_KEY)
 
-# Function to check if file extension is allowed
+embed_model = HuggingFaceEmbedding(
+    model_name="hkunlp/instructor-large"
+)
 
+# Set the LLM and embedding model in the Settings
+Settings.llm = llm
+Settings.embed_model = embed_model
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# Initialize query service
+query_service = QueryService(query_llm, embed_model, pc)
+
+# Access the processing_tasks dictionary
+processing_tasks = get_processing_tasks()
 
 # Function to add CORS headers to all responses
 
@@ -81,267 +87,8 @@ def after_request(response):
     return response
 
 
-# ollama settings
-# Initialize the LLM model
-llm = Ollama(model="llama3.2:3b-instruct-q8_0",
-             temprature=0,
-             request_timeout=3000,)
-
-# Initialize the embedding model
-embed_model = OllamaEmbedding(
-    model_name="llama3.2:3b-instruct-q8_0",
-    base_url="http://localhost:11434",
-    ollama_additional_kwargs={"mirostat": 0},
-)
-
-# Set the LLM and embedding model in the Settings
-Settings.llm = llm
-Settings.embed_model = embed_model
-
-# Initialize Pinecone
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
-pc = Pinecone(api_key=PINECONE_API_KEY)
-
-
-class PineconeRetriever(BaseRetriever):
-    def __init__(
-        self,
-        vector_store: PineconeVectorStore,
-        embed_model: Any,
-        query_mode: str = "hybrid",
-        similarity_top_k: int = 15,
-    ) -> None:
-        self._vector_store = vector_store
-        self._embed_model = embed_model
-        self._query_mode = query_mode
-        self._similarity_top_k = similarity_top_k
-        super().__init__()
-
-    def retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
-        if query_bundle.embedding is None:
-            query_embedding = self._embed_model.get_query_embedding(
-                query_bundle.query_str
-            )
-        else:
-            query_embedding = query_bundle.embedding
-
-        vector_store_query = VectorStoreQuery(
-            query_embedding=query_embedding,
-            similarity_top_k=self._similarity_top_k,
-            mode=self._query_mode,
-        )
-        query_result = self._vector_store.query(vector_store_query)
-
-        nodes_with_scores = []
-        for index, node in enumerate(query_result.nodes):
-            score: Optional[float] = None
-            if query_result.similarities is not None:
-                score = query_result.similarities[index]
-            nodes_with_scores.append(NodeWithScore(node=node, score=score))
-
-        return nodes_with_scores
-
-
-class PDFToMarkDownTextProcessor():
-    def __init__(self):
-        self.config = {
-            "output_format": "markdown",
-            "use_llm": True,
-            "disable_image_extraction": True,
-            "paginate_output": True,
-            "output_dir": 'output',
-            "use_fast": True,
-            "gemini_api_key": GOOGLE_API_KEY,
-        }
-
-        self.config_parser = ConfigParser(self.config)
-
-        self.converter = PdfConverter(
-            config=self.config_parser.generate_config_dict(),
-            artifact_dict=create_model_dict(),
-            processor_list=self.config_parser.get_processors(),
-            renderer=self.config_parser.get_renderer()
-        )
-
-    def process(self, file_path):
-        rendered = self.converter(file_path)
-        return rendered.markdown
-
-    def process_with_timeout(self, file_path, result_queue, timeout=300):
-        """Run the process with a timeout, allowing for interruption"""
-        try:
-            print(f"PDF processor: Starting conversion of {file_path}")
-            result = self.process(file_path)
-            print(f"PDF processor: Finished conversion, putting result in queue")
-            result_queue.put(result)
-        except Exception as e:
-            print(f"PDF processor error: {str(e)}")
-            result_queue.put(f"ERROR: {str(e)}")
-        finally:
-            # Ensure queue has something even if there's an unexpected error
-            if result_queue.empty():
-                result_queue.put("ERROR: Unknown error in PDF processing")
-
-
-class DocumentProcessor:
-    def __init__(self):
-        nest_asyncio.apply()
-
-    def process_document(self, file_path, doc_id=None):
-
-        # Check for cancellation before starting
-        if doc_id and processing_tasks.get(doc_id, {}).get('cancelled', False):
-            raise Exception("Processing cancelled by user")
-
-        # Converting To MD Text using a separate process that can be terminated
-        print(f"Starting PDF to Markdown conversion for {file_path}")
-
-        # Use Manager for more reliable cross-process communication
-        manager = multiprocessing.Manager()
-        result_queue = manager.Queue()
-
-        # Create and start the process
-        md_processor = PDFToMarkDownTextProcessor()
-        process = multiprocessing.Process(
-            target=md_processor.process_with_timeout,
-            args=(file_path, result_queue)
-        )
-
-        # Store the process in processing_tasks to be able to terminate it
-        if doc_id:
-            processing_tasks[doc_id]['process'] = process
-
-        process.start()
-        print(f"Started PDF conversion process with PID: {process.pid}")
-
-        # Wait for the process to complete or be cancelled
-        process_timeout = 600  # 10 minutes max
-        process_wait_interval = 1  # Check every second
-
-        for i in range(process_timeout):
-            # Check if process is done
-            if not process.is_alive():
-                print(f"PDF conversion process completed after {i} seconds")
-                break
-
-            # Check for cancellation
-            if doc_id and processing_tasks.get(doc_id, {}).get('cancelled', False):
-                print(f"Terminating PDF conversion process for {doc_id}")
-                process.terminate()
-                process.join(5)  # Give it 5 seconds to terminate
-                if process.is_alive():
-                    process.kill()  # Force kill if still alive
-                raise Exception("Processing cancelled by user")
-
-            # Wait a bit before checking again
-            time.sleep(process_wait_interval)
-
-        # If we got here and process is still running, it timed out
-        if process.is_alive():
-            print(f"PDF conversion timed out after {process_timeout} seconds")
-            process.terminate()
-            process.join(5)
-            if process.is_alive():
-                process.kill()
-            raise Exception("PDF conversion timed out")
-
-        # Get the result from the queue with timeout
-        try:
-            print("Waiting for result from PDF conversion...")
-            # Wait max 10 seconds for result
-            md_text = result_queue.get(block=True, timeout=10)
-            print("Got result from PDF conversion queue")
-
-            # Check if there was an error
-            if isinstance(md_text, str) and md_text.startswith("ERROR:"):
-                print(f"PDF conversion reported error: {md_text}")
-                raise Exception(md_text)
-        except Exception as e:
-            if "queue empty" in str(e).lower():
-                print("Queue was empty, PDF conversion failed to produce result")
-                raise Exception("PDF conversion failed to produce output")
-            else:
-                print(f"Error getting result from queue: {str(e)}")
-                raise
-
-        # Check for cancellation after markdown conversion
-        if doc_id and processing_tasks.get(doc_id, {}).get('cancelled', False):
-            raise Exception("Processing cancelled by user")
-
-        print(f"Creating document nodes")
-        # Create document nodes
-        # Extract just the filename without the path
-        filename = os.path.basename(file_path)
-        documents = [Document(text=part.strip(), metadata={
-            'file_name': filename,
-            'page_number': i
-        }) for i, part in enumerate(md_text.split('------PAGE_BREAK------')) if part.strip()]
-
-        # Check for cancellation after creating document nodes
-        if doc_id and processing_tasks.get(doc_id, {}).get('cancelled', False):
-            raise Exception("Processing cancelled by user")
-
-        # Parse and extract metadata
-        print(f"Parsing and extracting metadata")
-        node_parser = MarkdownNodeParser(show_progress=True)
-        extractors = [SummaryExtractor(summaries=["prev", "self", "next"], llm=llm), QuestionsAnsweredExtractor(
-            questions=3, llm=llm, metadata_mode=MetadataMode.EMBED),]
-
-        pipeline = IngestionPipeline(
-            transformations=[node_parser, *extractors])
-
-        nodes = pipeline.run(
-            nodes=documents, in_place=False, show_progress=True)
-
-        # Check for cancellation after pipeline run
-        if doc_id and processing_tasks.get(doc_id, {}).get('cancelled', False):
-            raise Exception("Processing cancelled by user")
-
-        # Generate embeddings
-        print(f"Generating embeddings")
-        for i, node in enumerate(nodes):
-            # Check for cancellation periodically during embedding generation
-            if doc_id and i % 5 == 0 and processing_tasks.get(doc_id, {}).get('cancelled', False):
-                raise Exception("Processing cancelled by user")
-
-            node.embedding = embed_model.get_text_embedding(
-                node.get_content(metadata_mode=MetadataMode.EMBED)
-            )
-
-        # Check for cancellation before Pinecone storage
-        if doc_id and processing_tasks.get(doc_id, {}).get('cancelled', False):
-            raise Exception("Processing cancelled by user")
-
-        # Store in Pinecone
-        print(f"Storing in Pinecone")
-        index_name = os.path.splitext(os.path.basename(file_path))[0]
-        if index_name not in pc.list_indexes().names():
-            pc.create_index(
-                index_name,
-                dimension=3072,
-                metric="euclidean",
-                spec=ServerlessSpec(cloud="aws", region="us-east-1")
-            )
-        pinecone_index = pc.Index(index_name)
-        vector_store = PineconeVectorStore(pinecone_index=pinecone_index)
-        vector_store.add(nodes)
-
-        # Final cancellation check
-        if doc_id and processing_tasks.get(doc_id, {}).get('cancelled', False):
-            raise Exception("Processing cancelled by user")
-
-        print(f"Document processing complete")
-
-
-# Track ongoing processing tasks
-processing_tasks = {}
-
-
 def process_doc(doc_id, file_path):
     """Function to handle document processing without blocking the upload response"""
-    import threading
-
     def process_thread():
         try:
             # Get document from database
@@ -355,16 +102,12 @@ def process_doc(doc_id, file_path):
             if processing_tasks.get(doc_id, {}).get('cancelled', False):
                 raise Exception("Processing cancelled by user")
 
-            print(f"Starting actual document processing for {doc_id}...")
+            print(f"Starting document processing for {doc_id}...")
 
-            # Use the DocumentProcessor to process the document
-            processor = DocumentProcessor()
+            # Initialize and use the DocumentProcessor
+            processor = DocumentProcessor(llm, embed_model, pc)
 
-            # Check for cancellation again before processing
-            if processing_tasks.get(doc_id, {}).get('cancelled', False):
-                raise Exception("Processing cancelled by user")
-
-            # Actually process the document with the doc_id for cancellation checking
+            # Process the document with the doc_id for cancellation checking
             processor.process_document(file_path, doc_id)
 
             # Final cancellation check
@@ -434,11 +177,11 @@ def upload_document():
 
             # Create document details with processing status in Supabase
             document_data = {
+                'id': str(uuid.uuid4()),
                 'user_id': user_id,
                 'file_name': filename,
                 'title': title,
                 'status': 'processing',
-
             }
 
             # Insert document into Supabase
@@ -459,10 +202,8 @@ def upload_document():
             processing_tasks[doc_id] = {
                 'status': 'processing', 'cancelled': False}
 
-            # Start simulated processing automatically
+            # Start processing
             try:
-                # Simulate processing in a non-blocking way (without await)
-                # In a production environment, you would use a task queue or background worker here
                 process_doc(doc_id, file_path)
 
                 return jsonify({
@@ -548,69 +289,85 @@ def cancel_processing(doc_id):
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
+@app.route('/query', methods=['POST'])
+def query_document():
+    data = request.json
+    print(data)
+    if not data or 'query' not in data or 'file_name' not in data or 'conversation_id' not in data:
+        return jsonify({'error': 'Missing query, file_name, or conversation_id'}), 400
+
+    filename = data['file_name']
+    query = data['query']
+    query_id = data['query_id']
+    conversation_id = str(data['conversation_id'])
+    base_fname = os.path.splitext(filename)[0]
+    document_id = str(data['document_id'])
+
+    # Get user ID from request, session, or create a new one
+    user_id = None
+
+    # Try to get user_id from request data first
+    if 'user_id' in data:
+        user_id = data['user_id']
+
+    try:
+        # Check if conversation exists
+        response = supabase.table('conversations').select(
+            '*').eq('id', conversation_id).execute()
+        if not response.data:
+            # Create a new conversation if it doesn't exist
+            conversation_data = {
+                'id': conversation_id,
+                'user_id': user_id,
+                'document_id': document_id,
+                'name': 'New Chat'
+            }
+            supabase.table('conversations').insert(conversation_data).execute()
+
+        # Store the user query in the messages table
+        user_message_data = {
+            'id': query_id,
+            'conversation_id': conversation_id,
+            'role': 'user',
+            'content': query
+        }
+        supabase.table('messages').insert(user_message_data).execute()
+
+        # Query the document using the user-specific service
+        response = query_service.query_document(user_id, base_fname, query)
+
+        # Handle case where document doesn't exist
+        if response is None:
+            return jsonify({
+                'error': f'Document {filename} not found',
+                'user_id': user_id  # Return user_id for client-side storage if needed
+            }), 404
+
+        # Store the assistant's response in the messages table
+        assistant_message_data = {
+            'id': str(uuid.uuid4()),
+            'conversation_id': conversation_id,
+            'role': 'assistant',
+            'content': response.response
+        }
+        supabase.table('messages').insert(assistant_message_data).execute()
+
+        # Return the response
+        return jsonify(assistant_message_data), 200
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'user_id': user_id  # Return user_id for client-side storage if needed
+        }), 500
+
+
 if __name__ == '__main__':
     # For multiprocessing to work properly on Windows
     multiprocessing.freeze_support()
-    # Configure logging to see process outputs clearly
-    import logging
+
+    # Configure logging
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
-    app.run(host='0.0.0.0', port=5000)
 
-
-# @app.route('/query', methods=['POST'])
-# # def query_document():
-#     data = request.json
-#     if not data or 'query' not in data or 'filename' not in data:
-#         return jsonify({'error': 'Missing query or filename'}), 400
-
-#     filename = data['filename']
-#     query = data['query']
-#     base_fname = os.path.splitext(filename)[0]
-
-#     processor = DocumentProcessor()
-#     if base_fname not in processor.chat_engines:
-#         try:
-#             file_path = os.path.join(UPLOAD_FOLDER, filename)
-#             chat_engine = processor.process_document(file_path)
-#         except Exception as e:
-#             return jsonify({'error': f'Error processing document: {str(e)}')}), 500
-#     else:
-#         chat_engine = processor.chat_engines[base_fname]
-
-#     try:
-#         # Query refinement
-#         query_refine_prompt = PromptTemplate(
-#             """... your query refinement prompt ...""")
-#         refined_query = llm.predict(query_refine_prompt, query=query).strip()
-
-#         # Get response#     data = request.json
-#         response = chat_engine.stream_chat(refined_query)ery' not in data or 'filename' not in data:
-#         return Response(me'}), 400
-#             (token for token in response.response_gen),
-#             mimetype='text/event-stream'
-#         )
-#     except Exception as e:fname = os.path.splitext(filename)[0]
-#         return jsonify({'error': str(e)}), 500
-#         try:
-#             file_path = os.path.join(UPLOAD_FOLDER, filename)
-#             chat_engine = processor.process_document(file_path)
-#         except Exception as e:
-#             return jsonify({'error': f'Error processing document: {str(e)}')}), 500
-#     else:
-#         chat_engine = processor.chat_engines[base_fname]
-
-#     try:
-#         # Query refinement
-#         query_refine_prompt = PromptTemplate(
-#             """... your query refinement prompt ...""")
-#         refined_query = llm.predict(query_refine_prompt, query=query).strip()
-
-#         # Get response
-#         response = chat_engine.stream_chat(refined_query)
-#         return Response(
-#             (token for token in response.response_gen),
-#             mimetype='text/event-stream'
-#         )
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+    # Start the Flask server
+    app.run(host=HOST, port=PORT)

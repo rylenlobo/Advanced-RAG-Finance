@@ -5,6 +5,7 @@ export type Message = {
   content: string;
   role: string;
   id: string;
+  isLoading?: boolean;
 };
 
 export async function fetchMessages(

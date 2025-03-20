@@ -39,8 +39,10 @@ import { PreviousChatsList } from "../types/types";
 import { useEffect } from "react";
 import { useInView } from "react-intersection-observer";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 
 import useDocumentStore from "@/store/currentDocStore";
+import { cn } from "@/lib/utils";
 
 function SkeletonLoader() {
   return (
@@ -84,7 +86,7 @@ export function NavPreviousChatsList() {
         </CollapsibleTrigger>
         <CollapsibleContent className="overflow-hidden group-data-[state=closed]/collapsible:animate-slideUp group-data-[state=open]/collapsible:animate-slideDown">
           {" "}
-          <SidebarMenu>
+          <SidebarMenu className="py-2">
             {status === "error" && error.message}
             {status === "pending" && <SkeletonLoader />}
             {status === "success" &&
@@ -112,9 +114,15 @@ export function NavPreviousChatsList() {
 
 function PreviousChat({ id, name }: PreviousChatsList) {
   const { isMobile } = useSidebar();
+
+  const { id: conversation_id } = useParams<{ id: string }>();
+
   return (
-    <SidebarMenuItem key={id} className="animate-in fade-in-0 duration-200">
-      <SidebarMenuButton asChild className="py-5 lg:py-0">
+    <SidebarMenuItem key={id} className="duration-200 animate-in fade-in-0">
+      <SidebarMenuButton
+        asChild
+        className={cn("py-5 lg:py-0 ", id === conversation_id && "bg-muted")}
+      >
         <Link href={`/chat/${id}`}>
           <MessageSquare />
           <p className="truncate text-base lg:text-sm">{name}</p>

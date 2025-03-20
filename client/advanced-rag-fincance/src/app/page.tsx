@@ -1,9 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { motion } from "framer-motion";
+import InputAI from "@/components/chat-input";
 
 export default function ChatInterface() {
   return (
@@ -24,19 +21,7 @@ export default function ChatInterface() {
         </div>
 
         {/* Search Input */}
-        <motion.div layoutId="search-input" className="relative">
-          <Input
-            type="text"
-            placeholder="Ask whatever you want..."
-            className="h-14 w-full rounded-full bg-secondary px-4 py-4"
-          />
-          <Button
-            size="icon"
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full"
-          >
-            <ArrowRight className="h-4 w-4 md:h-5 md:w-5" />
-          </Button>
-        </motion.div>
+        <InputAI />
       </div>
     </div>
   );

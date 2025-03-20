@@ -2,6 +2,23 @@
 
 A simple Flask server to handle file uploads and return responses with file name and status.
 
+## Project Structure
+
+```
+server/
+├── app.py                    # Main entry point with Flask routes
+├── uploads/                  # Directory for file uploads
+├── requirements.txt          # Python dependencies
+└── src/                      # Source code directory
+    ├── config.py             # Configuration and environment variables
+    ├── models/               # Data models directory
+    ├── services/             # Business logic services
+    │   ├── document_service.py # Document processing
+    │   └── pdf_service.py    # PDF to markdown conversion
+    └── utils/                # Utility functions
+        └── retriever.py      # Pinecone retriever implementation
+```
+
 ## Using System Python (Recommended for Quick Setup)
 
 If you want to use your system's Python installation:
