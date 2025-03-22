@@ -5,7 +5,8 @@
 ## Demo Video
 
 _For a visual demonstration of the project's capabilities, please watch the following video:_
-https://github.com/user-attachments/assets/b37de4e2-3621-483f-8950-be997356cec3
+https://github.com/user-attachments/assets/7671ea48-6efc-4b18-8f43-d84b558d9492
+
 
 ## Project Overview
 
