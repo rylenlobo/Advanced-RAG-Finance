@@ -122,8 +122,8 @@ class DocumentProcessor:
         # Parse and extract metadata
         print(f"Parsing and extracting metadata")
         node_parser = MarkdownNodeParser(show_progress=True)
-        extractors = [SummaryExtractor(summaries=["prev", "self", "next"], llm=self.llm),
-                      QuestionsAnsweredExtractor(questions=3, llm=self.llm, metadata_mode=MetadataMode.EMBED)]
+        extractors = [SummaryExtractor(
+            summaries=["prev", "self", "next"], llm=self.llm)]
 
         pipeline = IngestionPipeline(
             transformations=[node_parser, *extractors])
@@ -156,7 +156,7 @@ class DocumentProcessor:
             self.pc.create_index(
                 str(index_name).lower(),
                 dimension=768,
-                metric="euclidean",
+                metric="cosine",
                 spec=ServerlessSpec(cloud="aws", region="us-east-1")
             )
         pinecone_index = self.pc.Index(index_name)

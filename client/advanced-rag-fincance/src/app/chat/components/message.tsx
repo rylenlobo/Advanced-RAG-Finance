@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/typography/typography";
 import type { Message } from "@/network/fetch-messages";
 import { cn } from "@/lib/utils";
+import { LineChartComponent } from "@/components/ui/line-chart";
 
 export function Message({ message }: { message: Message }): React.ReactNode {
   const options = {
@@ -80,6 +81,14 @@ export function Message({ message }: { message: Message }): React.ReactNode {
       }
     }
   };
+
+  // LineChartComponent: {
+  //         component: LineChartComponent
+  //       },
+  //       // Add an alias for lowercase version that might be generated
+  //       linechartcomponent: {
+  //         component: LineChartComponent
+  //       }
 
   if (message.isLoading) {
     return (

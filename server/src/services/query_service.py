@@ -7,7 +7,6 @@ from llama_index.core.postprocessor import SentenceTransformerRerank
 from llama_index.vector_stores.pinecone import PineconeVectorStore
 from pinecone import Pinecone
 import nest_asyncio
-
 from src.utils.retriever import PineconeRetriever
 
 
@@ -24,45 +23,72 @@ class QueryService:
         self.chat_engines = {}
 
         # Default QA prompt template for context-based answering
-        self.qa_prompt = """\
-You are a skilled financial analyst assistant specializing in advanced RAG (Retrieval-Augmented Generation).  
-Your goal is to provide clear, concise answers primarily based on the provided context.  
-## Response Format:
-- Reply in **markdown**.
-- Dont wrap the response in ```markdown ``` that represents code in md when replying in markdown or any other code just directly output the text
+        self.qa_prompt = """
+        You are a skilled financial analyst assistant specializing in advanced RAG (Retrieval-Augmented Generation).  
+        Your goal is to provide clear, structured financial insights based on the provided document.
 
+        ## **Response Format:**
+        - Reply in **markdown**.
+        - Do not wrap responses in triple backticks (` ``` `) that represent code in markdown or any other language.
+       
+        ### **Guidelines:**
+        - **Use the Provided Context First:** Ensure all responses are derived from the given document.
+        - **Maintain Clarity and Precision:** Keep answers concise while preserving key financial details.
+        - **Perform Calculations If Needed:** Show only necessary steps without excessive details.
+        - **Handle Missing Information Appropriately:** If data is insufficient, ask for clarification rather than making assumptions.
+        - **Provide Document Location When Requested:** If asked for a source, mention the document and relevant page number.
+        - **Render Charts When Relevant:** If the response includes numerical data suitable for visualization, embed a `LineChartComponent`.
 
-## Guidelines:
-- **Dont wrap the response in ``` that represents code in md when replying in markdown or any other code just directly output the text
-- **Prioritize Given Context:** Answer using the provided context first, ensuring relevance.  
-- **Refer to Previous Conversations If Needed:** If key details are missing, check past interactions for additional information.  
-- **Perform Calculations If Required:** Show only essential steps.  
-- **Address Missing Information:** If the context is insufficient, ask for clarification instead of assuming.   
-- **Source Disclosure Only If Asked:** Provide only the answer unless the user requests the source.  
-- **Aditionally if asked for the resource or where the documents is located you provide that
--
+        ---
 
+        ### **Example Query & Expected Response Format:**
 
+        Q:How did Microsoft's stock perform from June 18 to June 23, 2024?
+        Microsoft's stock showed significant growth between June 18 and June 23, 2024. The stock started at **100** and reached **365.24**, with a peak on **June 21** at **285.40** before closing at **365.24**. *(Page 20)*  
 
+       
 
-### Use the below context to answer:  
----------------------  
-{context_str}  
----------------------  
+        ---
 
-{query_str}  
+        ### **Use the below context to answer:**
+        ---------------------
+        {context_str}
+        ---------------------
 
-### Response:  
-"""
+        {query_str}
+
+        ### **Response:**
+        """
+        # - **When data supports visualization, include a `LineChartComponent`** at the most contextually relevant position in the response.
+
+        # To display charts you use this format replace with necessary data you need to use the data available to render it in the exact format dont wrap it in ``` this will cause an error just output it normally
+        # <LineChartComponent dataset = {{
+        #     title: "Stock Performance Comparison",
+        #     description: "June 18 - June 23, 2024",
+        #     source: "Page 20",
+        #     data: [
+        #         {date: "6/18", Microsoft: 100, SP500: 100, NASDAQ: 100},
+        #         {date: "6/19", Microsoft: 138.07, SP500: 110.42, NASDAQ: 106.10},
+        #         {date: "6/20", Microsoft: 212.34, SP500: 118.70, NASDAQ: 156.93},
+        #         {date: "6/21", Microsoft: 285.40, SP500: 167.13, NASDAQ: 236.08},
+        #         {date: "6/22", Microsoft: 272.82, SP500: 149.39, NASDAQ: 184.53},
+        #         {date: "6/23", Microsoft: 365.24, SP500: 178.66, NASDAQ: 242.82},
+        #     ],
+        #     config: {
+        #         Microsoft: {label: "Microsoft Corporation"},
+        #         SP500: {label: "S&P 500"},
+        #         NASDAQ: {label: "NASDAQ Computer"},
+        #     },
+        # }} / >
 
         # Query refinement prompt
         self.query_refine_prompt = PromptTemplate("""\
-  Improve the given query **only if necessary** by correcting grammar or enhancing clarity.  
-Ensure the refined query strictly maintains the original intent and structure.  
-ONLY RESPOND WITH THE ENHANCED QUERY AND NOTHING ELSE.  
+    Improve the given query **only if necessary** by correcting grammar or enhancing clarity.  
+    Ensure the refined query strictly maintains the original intent and structure.  
+    ONLY RESPOND WITH THE ENHANCED QUERY AND NOTHING ELSE.  
 
-Original Query: {query}  
-""")
+    Original Query: {query}  
+    """)
 
     def get_chat_engine_key(self, user_id: str, document_name: str) -> str:
         return f"{user_id}:{document_name}"
